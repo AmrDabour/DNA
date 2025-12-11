@@ -2252,6 +2252,513 @@ h1, h2, h3, h4, h5, h6 {
     transform: scale(1.15);
 }
 
+/* LinkedIn Team Popup Styles - Advanced Effects */
+.linkedin-team-wrapper {
+    position: relative;
+    perspective: 1000px;
+}
+
+.linkedin-trigger {
+    position: relative;
+    background: linear-gradient(135deg, rgba(0, 119, 181, 0.25) 0%, rgba(0, 160, 220, 0.25) 100%) !important;
+    border: 1px solid rgba(0, 119, 181, 0.5) !important;
+    overflow: visible;
+}
+
+.linkedin-trigger::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-md);
+    background: conic-gradient(from 0deg, #0077b5, #00a0dc, #0077b5);
+    opacity: 0;
+    z-index: -1;
+    animation: none;
+    transition: opacity 0.3s ease;
+}
+
+.linkedin-trigger::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-md);
+    background: inherit;
+    z-index: -1;
+}
+
+.linkedin-trigger:hover::before {
+    opacity: 1;
+    animation: borderRotate 2s linear infinite;
+}
+
+@keyframes borderRotate {
+    to { transform: rotate(360deg); }
+}
+
+.linkedin-trigger:hover {
+    background: linear-gradient(135deg, #0077b5 0%, #00a0dc 100%) !important;
+    box-shadow: 
+        0 0 20px rgba(0, 119, 181, 0.6),
+        0 0 40px rgba(0, 160, 220, 0.4),
+        0 0 60px rgba(0, 119, 181, 0.2),
+        inset 0 0 20px rgba(255, 255, 255, 0.1);
+    animation: linkedinFloat 2s ease-in-out infinite;
+}
+
+.linkedin-trigger:hover i {
+    animation: iconDance 0.6s ease-in-out infinite;
+}
+
+@keyframes linkedinFloat {
+    0%, 100% { transform: translateY(-5px) scale(1.05); }
+    50% { transform: translateY(-10px) scale(1.08); }
+}
+
+@keyframes iconDance {
+    0%, 100% { transform: scale(1.15) rotate(0deg); }
+    25% { transform: scale(1.2) rotate(-5deg); }
+    75% { transform: scale(1.2) rotate(5deg); }
+}
+
+.team-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+    background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-secondary);
+    animation: badgePop 2s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
+}
+
+@keyframes badgePop {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(244, 63, 94, 0.5); }
+    25% { transform: scale(1.2) rotate(-10deg); box-shadow: 0 0 20px rgba(244, 63, 94, 0.8); }
+    50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(244, 63, 94, 0.6); }
+    75% { transform: scale(1.2) rotate(10deg); box-shadow: 0 0 20px rgba(244, 63, 94, 0.8); }
+}
+
+.linkedin-team-popup {
+    position: absolute;
+    bottom: 50%;
+    left: calc(100% + 20px);
+    transform: translateY(50%) translateX(-30px) rotateY(15deg) scale(0.9);
+    transform-origin: left center;
+    width: 260px;
+    background: linear-gradient(165deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.98) 50%, rgba(15, 23, 42, 0.98) 100%);
+    border-radius: var(--radius-xl);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    box-shadow: 
+        0 30px 60px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(0, 119, 181, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.linkedin-team-popup::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-xl);
+    padding: 1px;
+    background: linear-gradient(135deg, #0077b5 0%, #00a0dc 50%, #0077b5 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: borderGlow 3s linear infinite;
+}
+
+@keyframes borderGlow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.linkedin-team-popup::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -10px;
+    transform: translateY(-50%) rotate(45deg);
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(225deg, transparent 50%, rgba(15, 23, 42, 0.98) 50%);
+    border-left: 1px solid #0077b5;
+    border-bottom: 1px solid #0077b5;
+    box-shadow: -5px 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.linkedin-team-wrapper:hover .linkedin-team-popup {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(50%) translateX(0) rotateY(0deg) scale(1);
+}
+
+.popup-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.popup-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: headerShine 3s linear infinite;
+}
+
+@keyframes headerShine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.popup-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+}
+
+.popup-header i {
+    font-size: 1.4rem;
+    filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
+    animation: logoSpin 4s ease-in-out infinite;
+}
+
+@keyframes logoSpin {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-15deg) scale(1.1); }
+    50% { transform: rotate(0deg) scale(1); }
+    75% { transform: rotate(15deg) scale(1.1); }
+}
+
+.popup-members {
+    padding: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+}
+
+.popup-members::-webkit-scrollbar {
+    width: 4px;
+}
+
+.popup-members::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1, #8b5cf6);
+    border-radius: 4px;
+}
+
+.team-member {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 6px;
+    border: 1px solid transparent;
+    opacity: 0;
+    transform: translateX(-20px);
+    animation: memberSlideIn 0.5s ease forwards;
+}
+
+.team-member:nth-child(1) { animation-delay: 0.1s; }
+.team-member:nth-child(2) { animation-delay: 0.2s; }
+.team-member:nth-child(3) { animation-delay: 0.3s; }
+.team-member:nth-child(4) { animation-delay: 0.4s; }
+.team-member:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes memberSlideIn {
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.team-member::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+}
+
+.team-member::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+}
+
+.team-member:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateX(8px) scale(1.02);
+    box-shadow: 
+        0 5px 20px rgba(99, 102, 241, 0.2),
+        inset 0 0 20px rgba(99, 102, 241, 0.05);
+}
+
+.team-member:hover::before {
+    transform: translateX(100%);
+}
+
+.team-member:hover::after {
+    width: 300px;
+    height: 300px;
+}
+
+.member-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 
+        0 4px 15px rgba(99, 102, 241, 0.4),
+        inset 0 -2px 10px rgba(0, 0, 0, 0.2),
+        inset 0 2px 10px rgba(255, 255, 255, 0.2);
+    position: relative;
+    z-index: 1;
+}
+
+.member-avatar::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #6366f1, #8b5cf6, #a78bfa, #8b5cf6, #6366f1);
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 0.3s ease;
+}
+
+.member-avatar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    z-index: -1;
+}
+
+.team-member:hover .member-avatar {
+    transform: scale(1.15) rotate(360deg);
+    box-shadow: 
+        0 8px 25px rgba(99, 102, 241, 0.6),
+        0 0 30px rgba(139, 92, 246, 0.4);
+}
+
+.team-member:hover .member-avatar::before {
+    opacity: 1;
+    animation: avatarRing 2s linear infinite;
+}
+
+@keyframes avatarRing {
+    to { transform: rotate(360deg); }
+}
+
+.member-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.member-name {
+    color: #f1f5f9;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.team-member:hover .member-name {
+    color: #a78bfa;
+    text-shadow: 0 0 20px rgba(167, 139, 250, 0.5);
+}
+
+.member-connect {
+    color: #64748b;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.member-connect i {
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+}
+
+.team-member:hover .member-connect {
+    opacity: 1;
+    transform: translateY(0);
+    color: #6366f1;
+}
+
+.team-member:hover .member-connect i {
+    animation: arrowBounce 1s ease-in-out infinite;
+}
+
+@keyframes arrowBounce {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(5px); }
+}
+
+.popup-footer {
+    padding: 10px 16px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
+    border-top: 1px solid rgba(99, 102, 241, 0.2);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.popup-footer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.5), transparent);
+}
+
+.popup-footer span {
+    color: #94a3b8;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.popup-footer i {
+    color: #6366f1;
+    font-size: 0.9rem;
+    animation: teamPulse 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.5));
+}
+
+@keyframes teamPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.5)); }
+    50% { transform: scale(1.3); filter: drop-shadow(0 0 15px rgba(99, 102, 241, 0.8)); }
+}
+
+/* Particle Effects for LinkedIn Button */
+.linkedin-trigger .particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #00a0dc;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.linkedin-team-wrapper:hover .linkedin-trigger .particle {
+    animation: particleBurst 1s ease-out forwards;
+}
+
+.linkedin-trigger .particle:nth-child(1) { --angle: 0deg; --distance: 30px; animation-delay: 0s; }
+.linkedin-trigger .particle:nth-child(2) { --angle: 45deg; --distance: 35px; animation-delay: 0.05s; }
+.linkedin-trigger .particle:nth-child(3) { --angle: 90deg; --distance: 30px; animation-delay: 0.1s; }
+.linkedin-trigger .particle:nth-child(4) { --angle: 135deg; --distance: 35px; animation-delay: 0.15s; }
+.linkedin-trigger .particle:nth-child(5) { --angle: 180deg; --distance: 30px; animation-delay: 0.2s; }
+.linkedin-trigger .particle:nth-child(6) { --angle: 225deg; --distance: 35px; animation-delay: 0.25s; }
+.linkedin-trigger .particle:nth-child(7) { --angle: 270deg; --distance: 30px; animation-delay: 0.3s; }
+.linkedin-trigger .particle:nth-child(8) { --angle: 315deg; --distance: 35px; animation-delay: 0.35s; }
+
+@keyframes particleBurst {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--distance) * -1));
+    }
+}
+
+/* Responsive popup positioning */
+@media (max-width: 768px) {
+    .linkedin-team-popup {
+        bottom: calc(100% + 20px);
+        left: 50%;
+        transform: translateX(-50%) translateY(30px) rotateX(-15deg) scale(0.9);
+        width: 280px;
+    }
+    
+    .linkedin-team-wrapper:hover .linkedin-team-popup {
+        transform: translateX(-50%) translateY(0) rotateX(0deg) scale(1);
+    }
+    
+    .linkedin-team-popup::after {
+        top: auto;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%) rotate(45deg);
+        background: linear-gradient(135deg, transparent 50%, rgba(15, 23, 42, 0.98) 50%);
+        border-left: none;
+        border-right: 1px solid #0077b5;
+        border-bottom: 1px solid #0077b5;
+        box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.3);
+    }
+}
+
 /* Footer Widget */
 .footer-widget {
     margin-bottom: 1rem;

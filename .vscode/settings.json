@@ -6,6 +6,9 @@
     // Prevent conda base environment from auto-activating
     "terminal.integrated.env.windows": {
         "CONDA_AUTO_ACTIVATE_BASE": "false"
-    }
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python-envs.pythonProjects": []
 }
 
