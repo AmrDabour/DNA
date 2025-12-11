@@ -28,7 +28,7 @@ sqlalchemy==2.0.38
 statsmodels==0.14.4
 tensorflow==2.18.0
 tqdm==4.67.1
-transformers==4.51.1
+transformers==4.53.0
 umap-learn==0.5.7
 wheel==0.45.1
 xgboost==2.0.3
