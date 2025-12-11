@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - {{ current_user.username }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Profile Header -->
+    <section class="hero-section mb-5" data-aos="fade-up">
+        <div class="d-flex align-items-center gap-4 flex-wrap">
+            <div class="profile-avatar">
+                {% if current_user.avatar_url %}
+                <img src="{{ current_user.avatar_url }}" alt="{{ current_user.username }}" class="avatar-img">
+                {% else %}
+                <div class="avatar-placeholder">
+                    <i class="fas fa-user fa-3x"></i>
+                </div>
+                {% endif %}
+            </div>
+            <div>
+                <h1 class="display-5 fw-bold text-white mb-2">
+                    {{ current_user.full_name or current_user.username }}
+                </h1>
+                <p class="text-white-50 mb-2">
+                    <i class="fas fa-envelope me-2"></i>{{ current_user.email }}
+                </p>
+                <p class="text-white-50 mb-0">
+                    <i class="fas fa-calendar me-2"></i>Member since {{ current_user.created_at.strftime('%B %Y') if current_user.created_at else 'N/A' }}
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <div class="row g-4">
+        <!-- Stats Cards -->
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="100">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-dna"></i>
+                </div>
+                <div class="stat-value">{{ stats.total_analyses }}</div>
+                <div class="stat-label">Total Analyses</div>
+            </div>
+        </div>
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
+            <div class="stat-card">
+                <div class="stat-icon gold">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stat-value">{{ stats.starred_analyses }}</div>
+                <div class="stat-label">Starred Results</div>
+            </div>
+        </div>
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-value">{{ current_user.last_login.strftime('%b %d') if current_user.last_login else 'N/A' }}</div>
+                <div class="stat-label">Last Active</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-2">
+        <!-- Profile Settings -->
+        <div class="col-lg-6" data-aos="fade-up" data-aos-delay="400">
+            <div class="profile-card">
+                <div class="profile-card-header">
+                    <h5 class="mb-0"><i class="fas fa-user-edit me-2"></i>Profile Settings</h5>
+                </div>
+                <div class="profile-card-body">
+                    <form method="POST" action="{{ url_for('auth.update_profile') }}">
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="full_name" name="full_name" 
+                                   value="{{ current_user.full_name or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   value="{{ current_user.email }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+                            <small class="text-muted">Username cannot be changed</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="col-lg-6" data-aos="fade-up" data-aos-delay="500">
+            <div class="profile-card">
+                <div class="profile-card-header">
+                    <h5 class="mb-0"><i class="fas fa-key me-2"></i>Change Password</h5>
+                </div>
+                <div class="profile-card-body">
+                    <form method="POST" action="{{ url_for('auth.change_password') }}">
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6">
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-key me-2"></i>Update Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Analyses -->
+    <div class="row mt-4">
+        <div class="col-12" data-aos="fade-up" data-aos-delay="600">
+            <div class="profile-card">
+                <div class="profile-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Analyses</h5>
+                    <a href="{{ url_for('history.history_page') }}" class="btn btn-sm btn-outline-primary">
+                        View All <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+                <div class="profile-card-body">
+                    {% if stats.recent_analyses %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Sample ID</th>
+                                    <th>Type</th>
+                                    <th>Gender</th>
+                                    <th>Ancestry</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for analysis in stats.recent_analyses %}
+                                <tr>
+                                    <td><strong>{{ analysis.sample_id }}</strong></td>
+                                    <td><span class="badge bg-primary">{{ analysis.analysis_type }}</span></td>
+                                    <td>{{ analysis.gender_prediction or '-' }}</td>
+                                    <td>{{ analysis.ancestry_code or '-' }}</td>
+                                    <td>{{ analysis.created_at.strftime('%Y-%m-%d %H:%M') if analysis.created_at else '-' }}</td>
+                                    <td>
+                                        <a href="{{ url_for('history.view_analysis', analysis_id=analysis.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No analyses yet. Start by uploading a sample!</p>
+                        <a href="{{ url_for('upload.upload_file') }}" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i>Upload Sample
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Actions -->
+    <div class="row mt-4">
+        <div class="col-12" data-aos="fade-up">
+            <div class="d-flex gap-3 justify-content-end">
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger">
+                    <i class="fas fa-sign-out-alt me-2"></i>Sign Out
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        background: var(--gradient-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+    
+    .stat-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(99, 102, 241, 0.2);
+    }
+    
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.25rem;
+        color: white;
+    }
+    
+    .stat-icon.blue { background: linear-gradient(135deg, #6366f1, #818cf8); }
+    .stat-icon.gold { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+    .stat-icon.green { background: linear-gradient(135deg, #10b981, #34d399); }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    
+    .stat-label {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+    
+    .profile-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--glass-border);
+        overflow: hidden;
+    }
+    
+    .profile-card-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--glass-border);
+        background: rgba(99, 102, 241, 0.05);
+    }
+    
+    .profile-card-body {
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}

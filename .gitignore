@@ -1,0 +1,53 @@
+# Environment variables
+.env
+.env.*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Uploaded data (user uploads - temporary)
+uploads/
+
+# Generated result files (temporary prediction results)
+*_combined_prediction_results.json
+*_region_prediction_results.json
+*_simplified_results.json
+*_genotypes.csv
+
+# Log files
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*_backup.py
+*.bak
+
+# IDE
+.idea/
+*.swp
+*.swo
+# Note: .vscode/ is tracked to share workspace settings across machines
+
+# Note: Model files (.pkl), data files (.csv) in hapmap_data/ and new_model/ 
+# are INTENTIONALLY tracked because they are required for the app to work
+
+# Project-specific ignores
+k8s similar/

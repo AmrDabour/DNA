@@ -1,0 +1,11 @@
+{
+    // Disable conda auto-activation in Cursor/VSCode terminals
+    "python.terminal.activateEnvironment": false,
+    "python.terminal.activateEnvInCurrentTerminal": false,
+    
+    // Prevent conda base environment from auto-activating
+    "terminal.integrated.env.windows": {
+        "CONDA_AUTO_ACTIVATE_BASE": "false"
+    }
+}
+

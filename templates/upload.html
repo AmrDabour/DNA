@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}Upload SNP Data - Genova AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7" data-aos="fade-up">
+            <!-- Upload Card -->
+            <div class="upload-card">
+                <div class="upload-header">
+                    <div class="upload-icon-main">
+                        <i class="fas fa-dna"></i>
+                    </div>
+                    <h2 class="fw-bold mb-2">Upload SNP Data</h2>
+                    <p class="text-muted mb-0">Upload your CSV file to analyze genetic data</p>
+                </div>
+                
+                <form method="post" enctype="multipart/form-data" id="uploadForm">
+                    <!-- Drag & Drop Zone -->
+                    <div class="upload-zone" id="dropZone">
+                        <input class="d-none" type="file" id="fileInput" name="file" accept=".csv">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <h5 class="fw-bold mb-2">Drag & Drop your CSV file</h5>
+                        <p class="text-muted mb-3">or click to browse</p>
+                        <span class="format-badge"><i class="fas fa-file-csv me-1"></i>.csv format</span>
+                    </div>
+                    
+                    <!-- File Preview -->
+                    <div id="filePreview" class="file-preview" style="display: none;">
+                        <div class="file-info">
+                            <div class="file-icon">
+                                <i class="fas fa-file-csv"></i>
+                            </div>
+                            <div class="file-details">
+                                <h6 class="file-name" id="fileName">filename.csv</h6>
+                                <span class="file-size" id="fileSize">0 KB</span>
+                            </div>
+                            <button type="button" class="btn-remove" id="removeFile">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div id="uploadProgress" class="upload-progress" style="display: none;">
+                        <div class="progress-header">
+                            <span class="progress-label">Uploading...</span>
+                            <span class="progress-percent" id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" id="progressBarFill"></div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-upload" id="submitBtn" disabled>
+                        <i class="fas fa-rocket me-2"></i>
+                        <span>Upload & Analyze</span>
+                    </button>
+                </form>
+                
+                <!-- Required Format Info -->
+                <div class="format-info">
+                    <h6><i class="fas fa-info-circle me-2"></i>Required Columns</h6>
+                    <div class="format-tags">
+                        <span class="tag">SNP</span>
+                        <span class="tag">Allele1</span>
+                        <span class="tag">Allele2</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--glass-border);
+        padding: 2.5rem;
+        box-shadow: var(--shadow-xl);
+    }
+    
+    .upload-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .upload-icon-main {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: var(--gradient-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+    }
+    
+    .upload-icon-main i {
+        font-size: 1.8rem;
+        color: white;
+    }
+    
+    .upload-zone {
+        border: 2px dashed var(--glass-border);
+        border-radius: var(--radius-lg);
+        padding: 3rem 2rem;
+        text-align: center;
+        background: rgba(99, 102, 241, 0.02);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .upload-zone:hover,
+    .upload-zone.dragover {
+        border-color: var(--primary);
+        background: rgba(99, 102, 241, 0.05);
+        transform: translateY(-2px);
+    }
+    
+    .upload-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(99, 102, 241, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+    }
+    
+    .upload-icon i {
+        font-size: 1.5rem;
+        color: var(--primary);
+    }
+    
+    .format-badge {
+        padding: 0.5rem 1rem;
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: var(--radius-full);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--primary);
+    }
+    
+    .file-preview {
+        margin-top: 1.5rem;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .file-info {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        border-radius: var(--radius-lg);
+    }
+    
+    .file-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        background: rgba(16, 185, 129, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+    }
+    
+    .file-icon i {
+        font-size: 1.5rem;
+        color: #10b981;
+    }
+    
+    .file-details {
+        flex: 1;
+    }
+    
+    .file-name {
+        margin: 0;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .file-size {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    
+    .btn-remove {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .btn-remove:hover {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .upload-progress {
+        margin-top: 1.5rem;
+    }
+    
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+    
+    .progress-label {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+    
+    .progress-percent {
+        font-weight: 600;
+        color: var(--primary);
+    }
+    
+    .progress-bar-container {
+        height: 8px;
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: var(--radius-full);
+        overflow: hidden;
+    }
+    
+    .progress-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: var(--gradient-primary);
+        border-radius: var(--radius-full);
+        transition: width 0.3s ease;
+    }
+    
+    .btn-upload {
+        width: 100%;
+        margin-top: 1.5rem;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: var(--radius-lg);
+        background: var(--gradient-primary);
+        color: white;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    }
+    
+    .btn-upload:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+    }
+    
+    .btn-upload:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .format-info {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--glass-border);
+        text-align: center;
+    }
+    
+    .format-info h6 {
+        color: var(--text-muted);
+        font-weight: 500;
+        margin-bottom: 0.75rem;
+    }
+    
+    .format-tags {
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    
+    .tag {
+        padding: 0.35rem 0.75rem;
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: var(--radius-full);
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--primary);
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const removeFile = document.getElementById('removeFile');
+    const submitBtn = document.getElementById('submitBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressBarFill = document.getElementById('progressBarFill');
+    const progressPercent = document.getElementById('progressPercent');
+    
+    // Click to browse
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    // Drag events
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+    });
+    
+    // Drop handler
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            handleFile(files[0]);
+        }
+    });
+    
+    // File input change
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) {
+            handleFile(fileInput.files[0]);
+        }
+    });
+    
+    // Handle file
+    function handleFile(file) {
+        if (!file.name.endsWith('.csv')) {
+            alert('Please upload a CSV file');
+            return;
+        }
+        
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        dropZone.style.display = 'none';
+        filePreview.style.display = 'block';
+        submitBtn.disabled = false;
+        
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+    }
+    
+    // Remove file
+    removeFile.addEventListener('click', () => {
+        fileInput.value = '';
+        dropZone.style.display = 'block';
+        filePreview.style.display = 'none';
+        submitBtn.disabled = true;
+    });
+    
+    // Format file size
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    
+    // Form submit with progress
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        uploadProgress.style.display = 'block';
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i><span>Processing...</span>';
+        
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) {
+                clearInterval(interval);
+                progress = 90;
+            }
+            progressBarFill.style.width = progress + '%';
+            progressPercent.textContent = Math.round(progress) + '%';
+        }, 200);
+    });
+});
+</script>
+{% endblock %}

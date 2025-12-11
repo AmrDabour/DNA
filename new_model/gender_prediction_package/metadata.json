@@ -1,0 +1,17 @@
+{
+  "target": "sex",
+  "classes": {
+    "1": "Male",
+    "2": "Female"
+  },
+  "expected_features": 51,
+  "preprocessing_steps": [
+    "1. Match SNPs with the selected SNPs",
+    "2. Encode alleles using improved_encoding function",
+    "3. Transform with PCA",
+    "4. Add population_encoded feature (if needed)",
+    "5. Predict using classifier model"
+  ],
+  "package_creation_date": "2025-04-25 20:57:20",
+  "model_source": "HapMap3 data"
+}

@@ -1,0 +1,66 @@
+# ============================================================
+# DNA Genetic Prediction - Docker Compose Configuration
+# ============================================================
+version: '3.8'
+
+services:
+  # Main Flask Application
+  genovaai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: amrdabour/genovaai:${TAG:-latest}
+    container_name: genovaai-app
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-genetic_prediction_app_secret_key}
+      - DATABASE_URL=sqlite:///genovaai.db
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@genovaai.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - FLASK_ENV=production
+    volumes:
+      # Persist uploads and database
+      - genovaai-uploads:/app/uploads
+      - genovaai-instance:/app/instance
+      - genovaai-results:/app/result
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - genovaai-network
+
+  # Optional: Redis for caching (uncomment if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: genovaai-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - genovaai-redis:/data
+  #   networks:
+  #     - genovaai-network
+
+# Named volumes for data persistence
+volumes:
+  genovaai-uploads:
+    driver: local
+  genovaai-instance:
+    driver: local
+  genovaai-results:
+    driver: local
+  # genovaai-redis:
+  #   driver: local
+
+# Network configuration
+networks:
+  genovaai-network:
+    driver: bridge
+

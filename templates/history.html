@@ -1,0 +1,663 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis History - Genova AI{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Hero Section -->
+    <section class="hero-section mb-5" data-aos="fade-up">
+        <div class="hero-badge">
+            <i class="fas fa-history"></i>
+            <span>Analysis History</span>
+        </div>
+        <h1 class="display-5 fw-bold text-white mb-3">
+            Your <span class="text-gradient-light">Analyses</span>
+        </h1>
+        <p class="lead text-white-50 mb-0">
+            View, search, and manage all your genetic analysis results.
+        </p>
+    </section>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4" id="history-stats">
+        <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="100">
+            <div class="mini-stat-card">
+                <div class="mini-stat-icon blue"><i class="fas fa-dna"></i></div>
+                <div class="mini-stat-value" id="stat-total">0</div>
+                <div class="mini-stat-label">Total</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="200">
+            <div class="mini-stat-card">
+                <div class="mini-stat-icon green"><i class="fas fa-calendar-week"></i></div>
+                <div class="mini-stat-value" id="stat-recent">0</div>
+                <div class="mini-stat-label">This Week</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="300">
+            <div class="mini-stat-card">
+                <div class="mini-stat-icon gold"><i class="fas fa-star"></i></div>
+                <div class="mini-stat-value" id="stat-starred">0</div>
+                <div class="mini-stat-label">Starred</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="400">
+            <div class="mini-stat-card">
+                <div class="mini-stat-icon purple"><i class="fas fa-check-circle"></i></div>
+                <div class="mini-stat-value" id="stat-completed">0</div>
+                <div class="mini-stat-label">Completed</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-card mb-4" data-aos="fade-up">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="search-input" placeholder="Search by sample ID, ancestry...">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="filter-type">
+                    <option value="">All Types</option>
+                    <option value="combined">Combined</option>
+                    <option value="gender">Gender Only</option>
+                    <option value="ancestry">Ancestry Only</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="filter-status">
+                    <option value="">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" id="filter-date-from" placeholder="From">
+            </div>
+            <div class="col-md-2">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary flex-grow-1" id="apply-filters">
+                        <i class="fas fa-filter me-1"></i> Filter
+                    </button>
+                    <button class="btn btn-outline-secondary" id="clear-filters" title="Clear filters">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2 flex-wrap">
+            <button class="btn btn-sm filter-tag" data-filter="starred">
+                <i class="fas fa-star me-1"></i> Starred Only
+            </button>
+            <button class="btn btn-sm filter-tag" data-filter="today">
+                <i class="fas fa-calendar-day me-1"></i> Today
+            </button>
+            <button class="btn btn-sm filter-tag" data-filter="week">
+                <i class="fas fa-calendar-week me-1"></i> This Week
+            </button>
+        </div>
+    </div>
+
+    <!-- Results List -->
+    <div class="history-list" id="history-list">
+        <!-- Loading State -->
+        <div class="loading-state text-center py-5" id="loading-state">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p class="text-muted">Loading your analyses...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div class="empty-state text-center py-5" id="empty-state" style="display: none;">
+            <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+            <h4>No analyses found</h4>
+            <p class="text-muted">Start by uploading a genetic sample to analyze.</p>
+            <a href="{{ url_for('upload.upload_file') }}" class="btn btn-primary">
+                <i class="fas fa-upload me-2"></i>Upload Sample
+            </a>
+        </div>
+        
+        <!-- Results Container -->
+        <div id="results-container"></div>
+    </div>
+
+    <!-- Pagination -->
+    <nav class="mt-4" id="pagination-nav" style="display: none;">
+        <ul class="pagination justify-content-center" id="pagination">
+        </ul>
+    </nav>
+</div>
+
+<!-- Analysis Detail Modal - Using static backdrop to prevent accidental closes -->
+<div class="modal fade" id="analysisModal" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-dna me-2"></i>Analysis Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" class="btn btn-primary" id="view-full-btn">
+                    <i class="fas fa-external-link-alt me-2"></i>View Full Results
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Ensure body is always interactive when no modal is open */
+    body:not(.modal-open) {
+        overflow: auto !important;
+        padding-right: 0 !important;
+        pointer-events: auto !important;
+    }
+    
+    /* Ensure modal backdrop is properly layered */
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+    
+    .modal {
+        z-index: 1050 !important;
+    }
+    
+    /* Fix for stuck overlays */
+    .history-list {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .text-gradient-light {
+        background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .mini-stat-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .mini-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.1);
+    }
+    
+    .mini-stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1rem;
+    }
+    
+    .mini-stat-icon.blue { background: linear-gradient(135deg, #6366f1, #818cf8); }
+    .mini-stat-icon.green { background: linear-gradient(135deg, #10b981, #34d399); }
+    .mini-stat-icon.gold { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+    .mini-stat-icon.purple { background: linear-gradient(135deg, #8b5cf6, #a855f7); }
+    
+    .mini-stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1;
+    }
+    
+    .mini-stat-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    
+    .filter-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1.5rem;
+    }
+    
+    .filter-tag {
+        background: var(--bg-secondary);
+        border: 1px solid var(--glass-border);
+        color: var(--text-muted);
+        transition: all 0.3s ease;
+    }
+    
+    .filter-tag:hover,
+    .filter-tag.active {
+        background: var(--gradient-primary);
+        border-color: transparent;
+        color: white;
+    }
+    
+    .history-item {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .history-item:hover {
+        transform: translateX(5px);
+        border-color: var(--primary);
+        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.15);
+    }
+    
+    .history-item.starred {
+        border-left: 4px solid #f59e0b;
+    }
+    
+    .history-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+    
+    .sample-id {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: var(--text-primary);
+    }
+    
+    .history-item-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .history-item-body {
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+    }
+    
+    .result-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .result-group i {
+        color: var(--text-muted);
+        width: 20px;
+    }
+    
+    .history-item-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--glass-border);
+    }
+    
+    .history-date {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    
+    .history-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .star-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .star-btn:hover,
+    .star-btn.starred {
+        color: #f59e0b;
+    }
+    
+    .modal-content {
+        background: var(--bg-primary);
+        border: 1px solid var(--glass-border);
+    }
+    
+    .modal-header {
+        border-bottom-color: var(--glass-border);
+    }
+    
+    .modal-footer {
+        border-top-color: var(--glass-border);
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentPage = 1;
+    let currentFilters = {};
+    
+    // Load stats
+    loadStats();
+    
+    // Load initial data
+    loadHistory();
+    
+    // Event listeners
+    document.getElementById('apply-filters').addEventListener('click', () => {
+        currentPage = 1;
+        applyFilters();
+    });
+    
+    document.getElementById('clear-filters').addEventListener('click', clearFilters);
+    
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            currentPage = 1;
+            applyFilters();
+        }
+    });
+    
+    // Filter tags
+    document.querySelectorAll('.filter-tag').forEach(tag => {
+        tag.addEventListener('click', function() {
+            this.classList.toggle('active');
+            currentPage = 1;
+            applyFilters();
+        });
+    });
+    
+    function loadStats() {
+        fetch('/api/history/stats')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('stat-total').textContent = data.stats.total || 0;
+                    document.getElementById('stat-recent').textContent = data.stats.recent_week || 0;
+                    document.getElementById('stat-starred').textContent = data.stats.starred || 0;
+                    document.getElementById('stat-completed').textContent = data.stats.by_status?.completed || 0;
+                }
+            })
+            .catch(err => console.error('Error loading stats:', err));
+    }
+    
+    function loadHistory(page = 1) {
+        document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('results-container').innerHTML = '';
+        
+        const params = new URLSearchParams({
+            page: page,
+            per_page: 10,
+            ...currentFilters
+        });
+        
+        fetch(`/api/history?${params}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading-state').style.display = 'none';
+                
+                if (data.success && data.analyses.length > 0) {
+                    renderHistory(data.analyses);
+                    renderPagination(data.pagination);
+                } else {
+                    document.getElementById('empty-state').style.display = 'block';
+                    document.getElementById('pagination-nav').style.display = 'none';
+                }
+            })
+            .catch(err => {
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'block';
+                console.error('Error loading history:', err);
+            });
+    }
+    
+    function renderHistory(analyses) {
+        const container = document.getElementById('results-container');
+        container.innerHTML = analyses.map(analysis => `
+            <div class="history-item ${analysis.is_starred ? 'starred' : ''}" data-id="${analysis.id}">
+                <div class="history-item-header">
+                    <span class="sample-id">${analysis.sample_id}</span>
+                    <div class="history-item-badges">
+                        <span class="badge bg-primary">${analysis.analysis_type}</span>
+                        <span class="badge ${analysis.status === 'completed' ? 'bg-success' : analysis.status === 'failed' ? 'bg-danger' : 'bg-warning'}">${analysis.status}</span>
+                    </div>
+                </div>
+                <div class="history-item-body">
+                    ${analysis.gender_prediction ? `
+                    <div class="result-group">
+                        <i class="fas fa-venus-mars"></i>
+                        <span><strong>Gender:</strong> ${analysis.gender_prediction}</span>
+                        ${analysis.gender_correct !== null ? `
+                        <span class="badge ${analysis.gender_correct ? 'bg-success' : 'bg-danger'} ms-1">
+                            <i class="fas fa-${analysis.gender_correct ? 'check' : 'times'}"></i>
+                        </span>` : ''}
+                    </div>` : ''}
+                    ${analysis.ancestry_prediction ? `
+                    <div class="result-group">
+                        <i class="fas fa-globe"></i>
+                        <span><strong>Ancestry:</strong> ${analysis.ancestry_prediction} (${analysis.ancestry_code || 'N/A'})</span>
+                        ${analysis.ancestry_correct !== null ? `
+                        <span class="badge ${analysis.ancestry_correct ? 'bg-success' : 'bg-danger'} ms-1">
+                            <i class="fas fa-${analysis.ancestry_correct ? 'check' : 'times'}"></i>
+                        </span>` : ''}
+                    </div>` : ''}
+                </div>
+                <div class="history-item-footer">
+                    <span class="history-date">
+                        <i class="fas fa-clock me-1"></i>
+                        ${analysis.created_at ? new Date(analysis.created_at).toLocaleString() : 'Unknown'}
+                    </span>
+                    <div class="history-actions">
+                        <button class="star-btn ${analysis.is_starred ? 'starred' : ''}" onclick="toggleStar(event, ${analysis.id})" title="Star">
+                            <i class="fas fa-star"></i>
+                        </button>
+                        <a href="/history/view/${analysis.id}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i> View
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click handlers for detail view
+        container.querySelectorAll('.history-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (!e.target.closest('.history-actions')) {
+                    showAnalysisDetail(this.dataset.id);
+                }
+            });
+        });
+    }
+    
+    function renderPagination(pagination) {
+        if (pagination.pages <= 1) {
+            document.getElementById('pagination-nav').style.display = 'none';
+            return;
+        }
+        
+        document.getElementById('pagination-nav').style.display = 'block';
+        const paginationEl = document.getElementById('pagination');
+        let html = '';
+        
+        // Previous button
+        html += `<li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="${pagination.page - 1}">Previous</a>
+        </li>`;
+        
+        // Page numbers
+        for (let i = 1; i <= pagination.pages; i++) {
+            if (i === 1 || i === pagination.pages || (i >= pagination.page - 2 && i <= pagination.page + 2)) {
+                html += `<li class="page-item ${i === pagination.page ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>`;
+            } else if (i === pagination.page - 3 || i === pagination.page + 3) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+        }
+        
+        // Next button
+        html += `<li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="${pagination.page + 1}">Next</a>
+        </li>`;
+        
+        paginationEl.innerHTML = html;
+        
+        // Add click handlers
+        paginationEl.querySelectorAll('a[data-page]').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = parseInt(this.dataset.page);
+                if (page > 0 && page <= pagination.pages) {
+                    currentPage = page;
+                    loadHistory(page);
+                }
+            });
+        });
+    }
+    
+    function applyFilters() {
+        currentFilters = {
+            search: document.getElementById('search-input').value,
+            type: document.getElementById('filter-type').value,
+            status: document.getElementById('filter-status').value,
+            date_from: document.getElementById('filter-date-from').value
+        };
+        
+        // Check filter tags
+        if (document.querySelector('.filter-tag[data-filter="starred"].active')) {
+            currentFilters.starred = 'true';
+        }
+        
+        loadHistory(currentPage);
+    }
+    
+    function clearFilters() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('filter-type').value = '';
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-date-from').value = '';
+        document.querySelectorAll('.filter-tag').forEach(tag => tag.classList.remove('active'));
+        currentFilters = {};
+        currentPage = 1;
+        loadHistory();
+    }
+    
+    // Single modal instance to avoid multiple instances being created
+    let analysisModal = null;
+    const modalEl = document.getElementById('analysisModal');
+    
+    // Initialize modal once
+    if (modalEl) {
+        analysisModal = new bootstrap.Modal(modalEl, {
+            backdrop: true,
+            keyboard: true
+        });
+    }
+    
+    // Helper function to clean up modal artifacts
+    function cleanupModalBackdrop() {
+        // Remove ALL modal backdrops
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        // Remove modal-open class from body
+        document.body.classList.remove('modal-open');
+        // Reset body styles
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+    
+    window.showAnalysisDetail = function(id) {
+        fetch(`/api/history/${id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const analysis = data.analysis;
+                    document.getElementById('modal-body').innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <strong>Sample ID:</strong> ${analysis.sample_id}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong>Analysis Type:</strong> ${analysis.analysis_type}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong>Gender Prediction:</strong> ${analysis.gender_prediction || 'N/A'}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong>Ancestry:</strong> ${analysis.ancestry_prediction || 'N/A'} (${analysis.ancestry_code || 'N/A'})
+                            </div>
+                            <div class="col-12 mb-3">
+                                <strong>Processing Time:</strong> ${analysis.processing_time ? analysis.processing_time.toFixed(2) + 's' : 'N/A'}
+                            </div>
+                            <div class="col-12">
+                                <strong>Created:</strong> ${analysis.created_at ? new Date(analysis.created_at).toLocaleString() : 'Unknown'}
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('view-full-btn').href = `/history/view/${id}`;
+                    
+                    // Use the single modal instance
+                    if (analysisModal) {
+                        analysisModal.show();
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Error loading analysis details:', err);
+            });
+    };
+    
+    // Clean up modal backdrop when modal is hidden
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            cleanupModalBackdrop();
+        });
+        
+        // Also clean up on hide start (for safety)
+        modalEl.addEventListener('hide.bs.modal', function () {
+            // Small delay to ensure Bootstrap has time to clean up
+            setTimeout(cleanupModalBackdrop, 100);
+        });
+    }
+    
+    // Clean up any stuck backdrops on page load
+    cleanupModalBackdrop();
+    
+    window.toggleStar = function(event, id) {
+        event.stopPropagation();
+        fetch(`/api/history/${id}/star`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const btn = event.target.closest('.star-btn');
+                    btn.classList.toggle('starred', data.is_starred);
+                    loadStats();
+                }
+            });
+    };
+});
+</script>
+{% endblock %}

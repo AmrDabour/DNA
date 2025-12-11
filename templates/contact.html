@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Us - Genova AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .contact-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--glass-border);
+        padding: 2rem;
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+    
+    .contact-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+    }
+    
+    .contact-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: var(--radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        margin-bottom: 1.5rem;
+        color: white;
+    }
+    
+    .contact-icon.email { background: linear-gradient(135deg, #6366f1, #818cf8); }
+    .contact-icon.github { background: linear-gradient(135deg, #1f2937, #374151); }
+    .contact-icon.linkedin { background: linear-gradient(135deg, #0077b5, #00a0dc); }
+    .contact-icon.discord { background: linear-gradient(135deg, #5865F2, #7289da); }
+    
+    .social-link-large {
+        width: 46px;
+        height: 46px;
+        border-radius: var(--radius-md);
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+        border: 1px solid rgba(99, 102, 241, 0.4);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: all var(--transition-base);
+    }
+    
+    .social-link-large i {
+        font-size: 1.25rem;
+        color: #a5b4fc;
+        transition: all var(--transition-base);
+    }
+    
+    .social-link-large:hover {
+        background: var(--gradient-primary);
+        border-color: transparent;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(99, 102, 241, 0.5);
+    }
+    
+    .social-link-large:hover i {
+        color: #ffffff;
+        transform: scale(1.15);
+    }
+    
+    .faq-item {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .faq-item:hover {
+        border-color: var(--primary);
+    }
+    
+    .faq-question {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .faq-answer {
+        color: var(--text-secondary);
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- Hero Section -->
+    <section class="hero-section mb-5" data-aos="fade-up">
+        <div class="hero-badge">
+            <i class="fas fa-headset"></i>
+            <span>Get in Touch</span>
+        </div>
+        <h1 class="display-5 fw-bold text-white mb-3">
+            Contact <span style="background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Us</span>
+        </h1>
+        <p class="lead text-white-50 mb-0">
+            Have questions? We'd love to hear from you. Reach out through any of the channels below.
+        </p>
+    </section>
+
+    <!-- Contact Cards -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-6 col-lg-3" data-aos="fade-up" data-aos-delay="100">
+            <div class="contact-card text-center">
+                <div class="contact-icon email mx-auto">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <h5 class="fw-bold mb-2">Email</h5>
+                <p class="text-muted mb-3">For general inquiries</p>
+                <a href="mailto:genovaaiteam@gmail.com" class="btn btn-outline-primary">
+                    Send Email
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-md-6 col-lg-3" data-aos="fade-up" data-aos-delay="200">
+            <div class="contact-card text-center">
+                <div class="contact-icon github mx-auto">
+                    <i class="fa-brands fa-github"></i>
+                </div>
+                <h5 class="fw-bold mb-2">GitHub</h5>
+                <p class="text-muted mb-3">View source & contribute</p>
+                <a href="https://github.com/AmrDabour" target="_blank" class="btn btn-outline-primary">
+                    Visit GitHub
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-md-6 col-lg-3" data-aos="fade-up" data-aos-delay="300">
+            <div class="contact-card text-center">
+                <div class="contact-icon linkedin mx-auto">
+                    <i class="fa-brands fa-linkedin-in"></i>
+                </div>
+                <h5 class="fw-bold mb-2">LinkedIn</h5>
+                <p class="text-muted mb-3">Professional network</p>
+                <a href="https://www.linkedin.com/in/amrdabour/" target="_blank" class="btn btn-outline-primary">
+                    Connect
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-md-6 col-lg-3" data-aos="fade-up" data-aos-delay="400">
+            <div class="contact-card text-center">
+                <div class="contact-icon discord mx-auto">
+                    <i class="fa-brands fa-discord"></i>
+                </div>
+                <h5 class="fw-bold mb-2">Discord</h5>
+                <p class="text-muted mb-3">Join our community</p>
+                <a href="https://discord.gg/rWrzgzYe" target="_blank" class="btn btn-outline-primary">
+                    Join Server
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Contact Form -->
+        <div class="col-lg-6" data-aos="fade-up">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Send a Message</h5>
+                </div>
+                <div class="card-body">
+                    <form id="contactForm" onsubmit="submitContactForm(event)">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Your Name</label>
+                            <input type="text" class="form-control" id="name" placeholder="John Doe" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" placeholder="john@example.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Subject</label>
+                            <select class="form-select" id="subject" required>
+                                <option value="">Select a topic...</option>
+                                <option value="general">General Inquiry</option>
+                                <option value="support">Technical Support</option>
+                                <option value="bug">Bug Report</option>
+                                <option value="feature">Feature Request</option>
+                                <option value="data">Data & Privacy</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="message" class="form-label">Message</label>
+                            <textarea class="form-control" id="message" rows="5" placeholder="Your message..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-paper-plane me-2"></i>Send Message
+                        </button>
+                    </form>
+                    <div id="formSuccess" class="alert alert-success mt-3" style="display: none;">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Thank you for your message! We'll get back to you soon.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FAQ Section -->
+        <div class="col-lg-6" data-aos="fade-up" data-aos-delay="100">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Frequently Asked Questions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <i class="fas fa-dna text-primary"></i>
+                            What file formats do you support?
+                        </div>
+                        <p class="faq-answer">
+                            We support CSV files containing SNP data with columns for rsID, chromosome, position, and genotype.
+                        </p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <i class="fas fa-shield-alt text-primary"></i>
+                            Is my genetic data secure?
+                        </div>
+                        <p class="faq-answer">
+                            Yes! We use encryption for data transmission and storage. Your data is never shared without consent.
+                        </p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <i class="fas fa-chart-line text-primary"></i>
+                            How accurate are the predictions?
+                        </div>
+                        <p class="faq-answer">
+                            Our ancestry predictions achieve ~94% accuracy and gender predictions ~98% accuracy on HapMap data.
+                        </p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <i class="fas fa-trash-alt text-primary"></i>
+                            Can I delete my data?
+                        </div>
+                        <p class="faq-answer">
+                            Absolutely. You can delete your account and all associated data at any time from your profile settings.
+                        </p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <i class="fas fa-code text-primary"></i>
+                            Is this open source?
+                        </div>
+                        <p class="faq-answer">
+                            Check out our GitHub repository for more information about the project and how to contribute.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Info -->
+    <div class="row mt-5">
+        <div class="col-lg-8 mx-auto" data-aos="fade-up">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 100px; height: 100px; background: var(--gradient-primary);">
+                            <i class="fas fa-users fa-3x text-white"></i>
+                        </div>
+                    </div>
+                    <h4 class="fw-bold mb-2">Genova AI Team</h4>
+                    <p class="text-muted mb-4">Connect with us on social media</p>
+                    <div class="d-flex justify-content-center gap-3 flex-wrap">
+                        <a href="https://www.linkedin.com/in/amrdabour/" target="_blank" class="social-link-large" title="LinkedIn">
+                            <i class="fa-brands fa-linkedin-in"></i>
+                        </a>
+                        <a href="https://github.com/AmrDabour" target="_blank" class="social-link-large" title="GitHub">
+                            <i class="fa-brands fa-github"></i>
+                        </a>
+                        <a href="https://www.facebook.com/amr.dabour.3/" target="_blank" class="social-link-large" title="Facebook">
+                            <i class="fa-brands fa-facebook-f"></i>
+                        </a>
+                        <a href="https://discord.gg/rWrzgzYe" target="_blank" class="social-link-large" title="Discord">
+                            <i class="fa-brands fa-discord"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function submitContactForm(e) {
+    e.preventDefault();
+    
+    // Get form values
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    const subject = document.getElementById('subject').value;
+    const message = document.getElementById('message').value;
+    
+    // In a real app, you'd send this to a backend
+    console.log('Contact form submitted:', { name, email, subject, message });
+    
+    // Show success message
+    document.getElementById('formSuccess').style.display = 'block';
+    document.getElementById('contactForm').reset();
+    
+    // Hide success message after 5 seconds
+    setTimeout(() => {
+        document.getElementById('formSuccess').style.display = 'none';
+    }, 5000);
+}
+</script>
+{% endblock %}
+

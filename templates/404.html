@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found - Genova AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="error-container" data-aos="fade-up">
+                <!-- DNA Animation -->
+                <div class="error-dna mb-4">
+                    <div class="dna-strand-error">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+                
+                <!-- Error Code -->
+                <h1 class="error-code">
+                    <span class="digit" data-aos="zoom-in" data-aos-delay="100">4</span>
+                    <span class="digit dna-digit" data-aos="zoom-in" data-aos-delay="200">
+                        <i class="fas fa-dna fa-spin"></i>
+                    </span>
+                    <span class="digit" data-aos="zoom-in" data-aos-delay="300">4</span>
+                </h1>
+                
+                <!-- Error Message -->
+                <h2 class="fw-bold mb-3" data-aos="fade-up" data-aos-delay="400">Sequence Not Found</h2>
+                <p class="lead text-muted mb-4" data-aos="fade-up" data-aos-delay="500">
+                    The genetic sequence you're looking for doesn't exist in our database. 
+                    Perhaps it's been mutated to a different URL!
+                </p>
+                
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-center gap-3 flex-wrap" data-aos="fade-up" data-aos-delay="600">
+                    <a href="/" class="btn btn-primary btn-lg">
+                        <i class="fas fa-home me-2"></i>Return Home
+                    </a>
+                    <a href="/samples" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-vials me-2"></i>Browse Samples
+                    </a>
+                </div>
+                
+                <!-- Fun Facts -->
+                <div class="mt-5 pt-4 border-top" data-aos="fade-up" data-aos-delay="700">
+                    <p class="text-muted small">
+                        <i class="fas fa-lightbulb text-warning me-2"></i>
+                        <strong>Did you know?</strong> Human DNA is 99.9% identical between individuals!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .error-container {
+        padding: 3rem 0;
+    }
+    
+    .error-code {
+        font-size: 8rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .error-code .digit {
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .error-code .dna-digit {
+        font-size: 5rem;
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    .error-code .dna-digit i {
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+    }
+    
+    .error-dna {
+        position: relative;
+        height: 60px;
+    }
+    
+    .dna-strand-error {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+    }
+    
+    .dna-strand-error span {
+        width: 10px;
+        height: 40px;
+        background: var(--gradient-primary);
+        border-radius: 5px;
+        animation: dna-wave 1.5s ease-in-out infinite;
+    }
+    
+    .dna-strand-error span:nth-child(1) { animation-delay: 0s; }
+    .dna-strand-error span:nth-child(2) { animation-delay: 0.1s; }
+    .dna-strand-error span:nth-child(3) { animation-delay: 0.2s; }
+    .dna-strand-error span:nth-child(4) { animation-delay: 0.3s; }
+    .dna-strand-error span:nth-child(5) { animation-delay: 0.4s; }
+    
+    @keyframes dna-wave {
+        0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+        50% { transform: scaleY(1.2); opacity: 1; }
+    }
+    
+    @media (max-width: 768px) {
+        .error-code {
+            font-size: 5rem;
+        }
+        .error-code .dna-digit {
+            font-size: 3rem;
+        }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,825 @@
+{% extends "base.html" %}
+
+{% block title %}SNP Database - Genova AI{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Hero Section -->
+    <section class="hero-section mb-5" data-aos="fade-up">
+        <div class="hero-badge">
+            <i class="fas fa-database"></i>
+            <span>SNP Database</span>
+        </div>
+        <h1 class="display-5 fw-bold text-white mb-3">
+            SNP <span class="text-gradient-light">Explorer</span>
+        </h1>
+        <p class="lead text-white-50 mb-0">
+            Search and explore genetic variants, their functions, and disease associations.
+        </p>
+    </section>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4" id="snp-stats">
+        <div class="col-6 col-md-2" data-aos="fade-up" data-aos-delay="100">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value" id="stat-snps">0</div>
+                <div class="stat-mini-label">SNPs</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2" data-aos="fade-up" data-aos-delay="150">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value" id="stat-chromosomes">0</div>
+                <div class="stat-mini-label">Chromosomes</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2" data-aos="fade-up" data-aos-delay="200">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value" id="stat-genes">0</div>
+                <div class="stat-mini-label">Genes</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2" data-aos="fade-up" data-aos-delay="250">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value" id="stat-traits">0</div>
+                <div class="stat-mini-label">Traits</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2" data-aos="fade-up" data-aos-delay="300">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value" id="stat-diseases">0</div>
+                <div class="stat-mini-label">Diseases</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-card mb-4" data-aos="fade-up">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <div class="input-group input-group-lg">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="search-input" 
+                           placeholder="Search by rs ID, gene, trait...">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select form-select-lg" id="filter-chromosome">
+                    <option value="">Chromosome</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select form-select-lg" id="filter-gene">
+                    <option value="">Gene</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary btn-lg w-100" id="search-btn">
+                    <i class="fas fa-search me-2"></i>Search
+                </button>
+            </div>
+        </div>
+        
+        <!-- Quick Search Tags -->
+        <div class="mt-3">
+            <span class="text-muted me-2">Popular:</span>
+            <button class="btn btn-sm btn-outline-primary me-1 quick-search" data-query="eye color">Eye Color</button>
+            <button class="btn btn-sm btn-outline-primary me-1 quick-search" data-query="skin">Skin Pigmentation</button>
+            <button class="btn btn-sm btn-outline-primary me-1 quick-search" data-query="alzheimer">Alzheimer's</button>
+            <button class="btn btn-sm btn-outline-primary me-1 quick-search" data-query="cancer">Cancer</button>
+            <button class="btn btn-sm btn-outline-primary me-1 quick-search" data-query="APOE">APOE Gene</button>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-section">
+        <!-- Loading -->
+        <div class="text-center py-5" id="loading-state" style="display: none;">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p class="text-muted">Searching database...</p>
+        </div>
+        
+        <!-- Results Container -->
+        <div id="results-container" class="row g-4"></div>
+        
+        <!-- Empty State -->
+        <div class="empty-state text-center py-5" id="empty-state" style="display: none;">
+            <i class="fas fa-search fa-4x text-muted mb-3"></i>
+            <h4>No results found</h4>
+            <p class="text-muted">Try a different search term or clear filters.</p>
+        </div>
+    </div>
+
+    <!-- Modern Pagination -->
+    <div class="pagination-wrapper mt-4" id="pagination-nav" style="display: none;">
+        <div class="pagination-container">
+            <button class="pagination-btn pagination-prev" id="pagination-prev" disabled>
+                <i class="fas fa-chevron-left"></i>
+                <span>Previous</span>
+            </button>
+            <div class="pagination-numbers" id="pagination-numbers"></div>
+            <button class="pagination-btn pagination-next" id="pagination-next">
+                <span>Next</span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+        <div class="pagination-info" id="pagination-info"></div>
+    </div>
+</div>
+
+<!-- SNP Detail Modal -->
+<div class="modal fade" id="snpModal" tabindex="-1" aria-labelledby="snpModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="snpModalLabel"><i class="fas fa-dna me-2"></i><span id="modal-rsid">SNP Details</span></h5>
+                <button type="button" class="btn-close btn-close-white" aria-label="Close" onclick="closeSnpModal()"></button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-outline-primary" id="dbsnp-link" target="_blank">
+                    <i class="fas fa-external-link-alt me-2"></i>View on dbSNP
+                </a>
+                <button type="button" class="btn btn-secondary" onclick="closeSnpModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom backdrop that we control -->
+<div id="customBackdrop" class="custom-backdrop" onclick="closeSnpModal()"></div>
+
+<style>
+    /* Custom backdrop we control ourselves */
+    .custom-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+        cursor: pointer;
+    }
+    
+    .custom-backdrop.show {
+        display: block;
+    }
+    
+    /* Fix modal z-index stacking */
+    #snpModal {
+        z-index: 1055;
+    }
+    
+    .btn-close-white {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
+    
+    /* Modern Pagination Styles */
+    .pagination-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .pagination-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-full);
+        border: 1px solid var(--glass-border);
+        padding: 0.5rem;
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .pagination-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        font-weight: 500;
+        font-size: 0.875rem;
+        border-radius: var(--radius-full);
+        cursor: pointer;
+        transition: all var(--transition-base);
+    }
+    
+    .pagination-btn:hover:not(:disabled) {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary);
+    }
+    
+    .pagination-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+    
+    .pagination-btn i {
+        font-size: 0.75rem;
+    }
+    
+    .pagination-numbers {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    
+    .pagination-num {
+        min-width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 0.875rem;
+        border-radius: var(--radius-full);
+        cursor: pointer;
+        transition: all var(--transition-base);
+    }
+    
+    .pagination-num:hover:not(.active):not(.pagination-ellipsis) {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary);
+    }
+    
+    .pagination-num.active {
+        background: var(--gradient-primary);
+        color: white;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        transform: scale(1.05);
+    }
+    
+    .pagination-ellipsis {
+        cursor: default;
+        color: var(--text-muted);
+    }
+    
+    .pagination-info {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+    
+    .pagination-info strong {
+        color: var(--primary);
+        font-weight: 600;
+    }
+    
+    @media (max-width: 576px) {
+        .pagination-btn span {
+            display: none;
+        }
+        
+        .pagination-btn {
+            padding: 0.5rem 0.75rem;
+        }
+        
+        .pagination-num {
+            min-width: 36px;
+            height: 36px;
+            font-size: 0.8rem;
+        }
+    }
+
+    .text-gradient-light {
+        background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .stat-mini-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .stat-mini-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .stat-mini-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    
+    .search-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--glass-border);
+        padding: 1.5rem;
+    }
+    
+    .snp-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        overflow: hidden;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        height: 100%;
+    }
+    
+    .snp-card:hover {
+        transform: translateY(-5px);
+        border-color: var(--primary);
+        box-shadow: 0 15px 30px rgba(99, 102, 241, 0.2);
+    }
+    
+    .snp-card-header {
+        padding: 1rem 1.25rem;
+        background: rgba(99, 102, 241, 0.1);
+        border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .snp-rsid {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--primary);
+    }
+    
+    .snp-gene {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+    
+    .snp-card-body {
+        padding: 1.25rem;
+    }
+    
+    .snp-info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px dashed var(--glass-border);
+    }
+    
+    .snp-info-row:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    
+    .snp-info-label {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+    
+    .snp-info-value {
+        font-weight: 600;
+    }
+    
+    .trait-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary);
+        border-radius: 4px;
+        font-size: 0.75rem;
+        margin: 0.125rem;
+    }
+    
+    .disease-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        margin: 0.125rem;
+    }
+    
+    .significance-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .significance-badge.benign { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .significance-badge.risk { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    .significance-badge.protective { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    .significance-badge.drug { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+    
+    .modal-content {
+        background: var(--bg-primary);
+        border: 1px solid var(--glass-border);
+    }
+    
+    .modal-header {
+        border-bottom-color: var(--glass-border);
+        background: rgba(99, 102, 241, 0.05);
+    }
+    
+    .modal-footer {
+        border-top-color: var(--glass-border);
+    }
+    
+    .detail-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .detail-section h6 {
+        color: var(--primary);
+        margin-bottom: 0.75rem;
+        font-weight: 600;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load stats
+    loadStats();
+    
+    // Load filters
+    loadFilters();
+    
+    // Load initial data
+    searchSNPs();
+    
+    // Event listeners
+    document.getElementById('search-btn').addEventListener('click', searchSNPs);
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchSNPs();
+    });
+    
+    // Quick search
+    document.querySelectorAll('.quick-search').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.getElementById('search-input').value = this.dataset.query;
+            searchSNPs();
+        });
+    });
+    
+    function loadStats() {
+        fetch('/api/snp/stats')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('stat-snps').textContent = data.stats.total_snps;
+                    document.getElementById('stat-chromosomes').textContent = data.stats.chromosomes;
+                    document.getElementById('stat-genes').textContent = data.stats.genes;
+                    document.getElementById('stat-traits').textContent = data.stats.traits;
+                    document.getElementById('stat-diseases').textContent = data.stats.diseases;
+                }
+            });
+    }
+    
+    function loadFilters() {
+        // Load chromosomes
+        fetch('/api/snp/chromosomes')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const select = document.getElementById('filter-chromosome');
+                    data.chromosomes.forEach(chr => {
+                        const option = document.createElement('option');
+                        option.value = chr;
+                        option.textContent = `Chr ${chr}`;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        
+        // Load genes
+        fetch('/api/snp/genes')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const select = document.getElementById('filter-gene');
+                    data.genes.forEach(gene => {
+                        const option = document.createElement('option');
+                        option.value = gene;
+                        option.textContent = gene;
+                        select.appendChild(option);
+                    });
+                }
+            });
+    }
+    
+    function searchSNPs(page = 1) {
+        const query = document.getElementById('search-input').value;
+        const chromosome = document.getElementById('filter-chromosome').value;
+        const gene = document.getElementById('filter-gene').value;
+        
+        document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('results-container').innerHTML = '';
+        document.getElementById('empty-state').style.display = 'none';
+        
+        const params = new URLSearchParams({
+            q: query,
+            chromosome: chromosome,
+            gene: gene,
+            page: page
+        });
+        
+        fetch(`/api/snp/search?${params}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading-state').style.display = 'none';
+                
+                if (data.success && data.snps.length > 0) {
+                    renderSNPs(data.snps);
+                    renderPagination(data.pagination);
+                } else {
+                    document.getElementById('empty-state').style.display = 'block';
+                    document.getElementById('pagination-nav').style.display = 'none';
+                }
+            })
+            .catch(err => {
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'block';
+                console.error('Error:', err);
+            });
+    }
+    
+    function renderSNPs(snps) {
+        const container = document.getElementById('results-container');
+        container.innerHTML = snps.map(snp => `
+            <div class="col-md-6 col-lg-4">
+                <div class="snp-card" onclick="showSNPDetail('${snp.rs_id}')">
+                    <div class="snp-card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="snp-rsid">${snp.rs_id}</span>
+                            <span class="significance-badge ${getSignificanceClass(snp.clinical_significance)}">
+                                ${snp.clinical_significance}
+                            </span>
+                        </div>
+                        <div class="snp-gene"><i class="fas fa-dna me-1"></i>${snp.gene_symbol || 'Unknown gene'}</div>
+                    </div>
+                    <div class="snp-card-body">
+                        <div class="snp-info-row">
+                            <span class="snp-info-label">Chromosome</span>
+                            <span class="snp-info-value">Chr ${snp.chromosome}:${snp.position?.toLocaleString() || 'N/A'}</span>
+                        </div>
+                        <div class="snp-info-row">
+                            <span class="snp-info-label">Alleles</span>
+                            <span class="snp-info-value">${snp.ref_allele || '-'} → ${snp.alt_allele || '-'}</span>
+                        </div>
+                        <div class="snp-info-row">
+                            <span class="snp-info-label">MAF</span>
+                            <span class="snp-info-value">${snp.maf ? (snp.maf * 100).toFixed(1) + '%' : 'N/A'}</span>
+                        </div>
+                        <div class="mt-2">
+                            ${(snp.associated_traits || []).slice(0, 3).map(trait => 
+                                `<span class="trait-badge">${trait}</span>`
+                            ).join('')}
+                            ${(snp.disease_associations || []).slice(0, 2).map(disease => 
+                                `<span class="disease-badge">${disease}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function getSignificanceClass(significance) {
+        if (!significance) return '';
+        const lower = significance.toLowerCase();
+        if (lower.includes('benign')) return 'benign';
+        if (lower.includes('risk') || lower.includes('pathogenic')) return 'risk';
+        if (lower.includes('protective')) return 'protective';
+        if (lower.includes('drug')) return 'drug';
+        return '';
+    }
+    
+    function renderPagination(pagination) {
+        if (!pagination || pagination.pages <= 1) {
+            document.getElementById('pagination-nav').style.display = 'none';
+            return;
+        }
+        
+        document.getElementById('pagination-nav').style.display = 'flex';
+        
+        const numbersContainer = document.getElementById('pagination-numbers');
+        const prevBtn = document.getElementById('pagination-prev');
+        const nextBtn = document.getElementById('pagination-next');
+        const infoEl = document.getElementById('pagination-info');
+        
+        // Update prev/next buttons
+        prevBtn.disabled = pagination.page === 1;
+        nextBtn.disabled = pagination.page === pagination.pages;
+        
+        prevBtn.onclick = () => { if (pagination.page > 1) searchSNPs(pagination.page - 1); };
+        nextBtn.onclick = () => { if (pagination.page < pagination.pages) searchSNPs(pagination.page + 1); };
+        
+        // Generate page numbers with ellipsis for many pages
+        let html = '';
+        const currentPage = pagination.page;
+        const totalPages = pagination.pages;
+        
+        const getPageNumbers = () => {
+            const pages = [];
+            const showEllipsisStart = currentPage > 3;
+            const showEllipsisEnd = currentPage < totalPages - 2;
+            
+            // Always show first page
+            pages.push(1);
+            
+            if (showEllipsisStart) {
+                pages.push('...');
+            }
+            
+            // Show pages around current
+            for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                if (!pages.includes(i)) {
+                    pages.push(i);
+                }
+            }
+            
+            if (showEllipsisEnd) {
+                pages.push('...');
+            }
+            
+            // Always show last page
+            if (totalPages > 1 && !pages.includes(totalPages)) {
+                pages.push(totalPages);
+            }
+            
+            return pages;
+        };
+        
+        const pageNumbers = getPageNumbers();
+        
+        pageNumbers.forEach(page => {
+            if (page === '...') {
+                html += `<span class="pagination-num pagination-ellipsis">...</span>`;
+            } else {
+                html += `<button class="pagination-num ${page === currentPage ? 'active' : ''}" onclick="searchSNPs(${page})">${page}</button>`;
+            }
+        });
+        
+        numbersContainer.innerHTML = html;
+        
+        // Update info text
+        const startItem = (currentPage - 1) * (pagination.per_page || 12) + 1;
+        const endItem = Math.min(currentPage * (pagination.per_page || 12), pagination.total || 0);
+        infoEl.innerHTML = `Showing <strong>${startItem}-${endItem}</strong> of <strong>${pagination.total || 0}</strong> results`;
+    }
+    
+    window.showSNPDetail = function(rsId) {
+        fetch(`/api/snp/${rsId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const snp = data.snp;
+                    document.getElementById('modal-rsid').textContent = snp.rs_id;
+                    document.getElementById('dbsnp-link').href = `https://www.ncbi.nlm.nih.gov/snp/${snp.rs_id}`;
+                    
+                    document.getElementById('modal-body').innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="detail-section">
+                                    <h6><i class="fas fa-info-circle me-2"></i>Basic Information</h6>
+                                    <table class="table table-sm">
+                                        <tr><td>RS ID</td><td><strong>${snp.rs_id}</strong></td></tr>
+                                        <tr><td>Chromosome</td><td>Chr ${snp.chromosome}</td></tr>
+                                        <tr><td>Position</td><td>${snp.position?.toLocaleString() || 'N/A'}</td></tr>
+                                        <tr><td>Gene</td><td>${snp.gene_name} (${snp.gene_symbol})</td></tr>
+                                        <tr><td>Function</td><td>${snp.function_class}</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-section">
+                                    <h6><i class="fas fa-dna me-2"></i>Allele Information</h6>
+                                    <table class="table table-sm">
+                                        <tr><td>Reference</td><td><strong>${snp.ref_allele}</strong></td></tr>
+                                        <tr><td>Alternative</td><td><strong>${snp.alt_allele}</strong></td></tr>
+                                        <tr><td>Minor Allele</td><td>${snp.minor_allele}</td></tr>
+                                        <tr><td>MAF</td><td>${snp.maf ? (snp.maf * 100).toFixed(1) + '%' : 'N/A'}</td></tr>
+                                        ${snp.risk_allele ? `<tr><td>Risk Allele</td><td class="text-danger">${snp.risk_allele}</td></tr>` : ''}
+                                        ${snp.odds_ratio ? `<tr><td>Odds Ratio</td><td>${snp.odds_ratio}</td></tr>` : ''}
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h6><i class="fas fa-heartbeat me-2"></i>Clinical Significance</h6>
+                            <span class="significance-badge ${getSignificanceClass(snp.clinical_significance)} me-2">
+                                ${snp.clinical_significance}
+                            </span>
+                            ${snp.population_specific ? `<span class="text-muted">${snp.population_specific}</span>` : ''}
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h6><i class="fas fa-user me-2"></i>Associated Traits</h6>
+                            <div>
+                                ${(snp.associated_traits || []).map(t => `<span class="trait-badge">${t}</span>`).join(' ')}
+                                ${snp.associated_traits?.length === 0 ? '<span class="text-muted">No traits associated</span>' : ''}
+                            </div>
+                        </div>
+                        
+                        ${snp.disease_associations?.length > 0 ? `
+                        <div class="detail-section">
+                            <h6><i class="fas fa-file-medical me-2"></i>Disease Associations</h6>
+                            <div>
+                                ${snp.disease_associations.map(d => `<span class="disease-badge">${d}</span>`).join(' ')}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <div class="detail-section">
+                            <h6><i class="fas fa-book me-2"></i>Description</h6>
+                            <p class="mb-0">${snp.description || 'No description available.'}</p>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h6><i class="fas fa-database me-2"></i>Source</h6>
+                            <span class="text-muted">${snp.source || 'dbSNP'}</span>
+                        </div>
+                    `;
+                    
+                    // Show the modal manually without Bootstrap's backdrop
+                    const modalElement = document.getElementById('snpModal');
+                    const customBackdrop = document.getElementById('customBackdrop');
+                    
+                    // Remove any Bootstrap backdrops that might exist
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    
+                    // Show our custom backdrop
+                    customBackdrop.classList.add('show');
+                    
+                    // Show modal manually
+                    modalElement.classList.add('show');
+                    modalElement.style.display = 'block';
+                    modalElement.setAttribute('aria-hidden', 'false');
+                    document.body.classList.add('modal-open');
+                }
+            })
+            .catch(err => {
+                console.error('Error loading SNP details:', err);
+            });
+    };
+    
+    window.searchSNPs = searchSNPs;
+    
+    // Global function to close modal
+    window.closeSnpModal = function() {
+        const modalElement = document.getElementById('snpModal');
+        const customBackdrop = document.getElementById('customBackdrop');
+        
+        // Hide modal
+        modalElement.classList.remove('show');
+        modalElement.style.display = 'none';
+        modalElement.setAttribute('aria-hidden', 'true');
+        
+        // Hide our custom backdrop
+        customBackdrop.classList.remove('show');
+        
+        // Remove any Bootstrap backdrops that might have appeared
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        
+        // Reset body
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    };
+    
+    // Handle Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const modalElement = document.getElementById('snpModal');
+            if (modalElement.classList.contains('show')) {
+                closeSnpModal();
+            }
+        }
+    });
+    
+    // Click outside modal content to close
+    document.getElementById('snpModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeSnpModal();
+        }
+    });
+    
+    // Safety cleanup on page load
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+});
+</script>
+{% endblock %}

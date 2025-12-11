@@ -1,0 +1,1013 @@
+{% extends "base.html" %}
+
+{% block title %}Genetic Visualizations & Analytics{% endblock %}
+
+{% block extra_css %}
+<style>
+    .viz-hero {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+    
+    .viz-hero h1 {
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .viz-hero p {
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+    
+    .plot-card {
+        border-radius: 15px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        height: 100%;
+    }
+    
+    .plot-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 35px var(--shadow-color);
+    }
+    
+    .plot-card img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        transition: transform 0.5s ease;
+    }
+    
+    .plot-card:hover img {
+        transform: scale(1.05);
+    }
+    
+    .plot-card .card-body {
+        padding: 1rem;
+    }
+    
+    .plot-card .card-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .plot-card .card-text {
+        font-size: 0.85rem;
+        color: var(--text-color);
+        opacity: 0.8;
+    }
+    
+    .category-header {
+        display: flex;
+        align-items: center;
+        margin: 2rem 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--accent-color);
+    }
+    
+    .category-header i {
+        font-size: 1.5rem;
+        margin-right: 0.75rem;
+        color: var(--accent-color);
+    }
+    
+    .category-header h3 {
+        margin: 0;
+        font-weight: 600;
+    }
+    
+    .stats-card {
+        background: linear-gradient(145deg, var(--card-bg), var(--bg-color));
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stats-card .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+    
+    .stats-card .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+    
+    .filter-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .filter-tab {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 2px solid var(--primary-color);
+        background: transparent;
+        color: var(--primary-color);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+    
+    .filter-tab:hover, .filter-tab.active {
+        background: var(--primary-color);
+        color: white;
+    }
+    
+    .filter-tab-eval {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 2px solid var(--primary-color);
+        background: var(--card-bg);
+        color: var(--text-color);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+    
+    .filter-tab-eval:hover {
+        background: rgba(67, 97, 238, 0.15);
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+    
+    .filter-tab-eval.active {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 15px rgba(67, 97, 238, 0.4);
+    }
+    
+    [data-bs-theme="dark"] .filter-tab-eval {
+        background: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--primary-color);
+    }
+    
+    [data-bs-theme="dark"] .filter-tab-eval:hover {
+        background: rgba(76, 201, 240, 0.2);
+        color: var(--primary-color);
+    }
+    
+    [data-bs-theme="dark"] .filter-tab-eval.active {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+    }
+    
+    .accuracy-section {
+        background: var(--card-bg);
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 5px 20px var(--shadow-color);
+    }
+    
+    .progress-custom {
+        height: 30px;
+        border-radius: 15px;
+        overflow: hidden;
+        background: var(--bg-color);
+    }
+    
+    .progress-custom .progress-bar {
+        border-radius: 15px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .accuracy-table {
+        margin-top: 1.5rem;
+    }
+    
+    .accuracy-table th {
+        background: var(--primary-color);
+        color: white;
+        font-weight: 600;
+    }
+    
+    .modal-plot {
+        max-width: 90vw;
+    }
+    
+    .modal-plot img {
+        width: 100%;
+        max-height: 80vh;
+        object-fit: contain;
+    }
+    
+    .plot-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+    }
+    
+    .search-box {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
+    .search-box input {
+        padding-left: 3rem;
+        border-radius: 25px;
+        border: 2px solid var(--primary-color);
+        height: 50px;
+        background-color: var(--card-bg);
+        color: var(--text-color);
+    }
+    
+    .search-box input::placeholder {
+        color: var(--text-color);
+        opacity: 0.6;
+    }
+    
+    .search-box input:focus {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+    }
+    
+    .search-box i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--primary-color);
+    }
+    
+    .viz-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .fade-in-up {
+        animation: fadeInUp 0.5s ease forwards;
+        opacity: 0;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .loading-overlay.active {
+        display: flex;
+    }
+    
+    .tabs-container {
+        margin-bottom: 2rem;
+    }
+    
+    .nav-pills .nav-link {
+        border-radius: 25px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        margin-right: 0.5rem;
+        color: var(--text-color);
+        background-color: var(--card-bg);
+        border: 2px solid var(--card-bg);
+        transition: all 0.3s ease;
+    }
+    
+    .nav-pills .nav-link:after {
+        display: none !important;
+    }
+    
+    .nav-pills .nav-link:hover {
+        background-color: rgba(67, 97, 238, 0.15);
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+    
+    .nav-pills .nav-link.active {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white !important;
+        border-color: transparent;
+        box-shadow: 0 4px 15px rgba(67, 97, 238, 0.4);
+    }
+    
+    [data-bs-theme="dark"] .nav-pills .nav-link {
+        color: #f8f9fa;
+        background-color: #2a2a2a;
+        border-color: #2a2a2a;
+    }
+    
+    [data-bs-theme="dark"] .nav-pills .nav-link:hover {
+        background-color: rgba(76, 201, 240, 0.2);
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    
+    [data-bs-theme="dark"] .nav-pills .nav-link.active {
+        color: white !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pt-3">
+    <!-- Hero Section -->
+    <div class="viz-hero fade-in-up">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1><i class="fas fa-chart-area me-2"></i>Genetic Visualizations & Analytics</h1>
+                <p>Explore comprehensive genetic analysis through interactive visualizations, model performance metrics, and population insights.</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-flex justify-content-end gap-2">
+                    <span class="badge bg-light text-dark p-2">
+                        <i class="fas fa-images me-1"></i> {{ plot_files|length if plot_files else 0 }} Plots
+                    </span>
+                    <span class="badge bg-light text-dark p-2">
+                        <i class="fas fa-database me-1"></i> Live Data
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="stats-card fade-in-up" style="animation-delay: 0.1s">
+                <div class="stat-number">{{ (gender_accuracy.overall_accuracy * 100)|round(1) if gender_accuracy else 'N/A' }}%</div>
+                <div class="stat-label"><i class="fas fa-venus-mars me-1"></i> Gender Prediction Accuracy</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stats-card fade-in-up" style="animation-delay: 0.2s">
+                <div class="stat-number">11</div>
+                <div class="stat-label"><i class="fas fa-globe-americas me-1"></i> Population Groups</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stats-card fade-in-up" style="animation-delay: 0.3s">
+                <div class="stat-number">{{ (plot_files|length if plot_files else 26) + (viz_files|length if viz_files else 22) }}</div>
+                <div class="stat-label"><i class="fas fa-chart-pie me-1"></i> Available Plots</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stats-card fade-in-up" style="animation-delay: 0.4s">
+                <div class="stat-number">2</div>
+                <div class="stat-label"><i class="fas fa-brain me-1"></i> ML Models</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs Navigation -->
+    <div class="tabs-container">
+        <ul class="nav nav-pills" id="vizTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="accuracy-tab" data-bs-toggle="pill" data-bs-target="#accuracy-content" type="button" role="tab">
+                    <i class="fas fa-bullseye me-1"></i> Model Accuracy
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="model-eval-tab" data-bs-toggle="pill" data-bs-target="#model-eval-content" type="button" role="tab">
+                    <i class="fas fa-microscope me-1"></i> Model Evaluation
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="plots-tab" data-bs-toggle="pill" data-bs-target="#plots-content" type="button" role="tab">
+                    <i class="fas fa-images me-1"></i> Plot Gallery
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="pca-tab" data-bs-toggle="pill" data-bs-target="#pca-content" type="button" role="tab">
+                    <i class="fas fa-project-diagram me-1"></i> PCA Analysis
+                </button>
+            </li>
+        </ul>
+    </div>
+    
+    <!-- Tab Contents -->
+    <div class="tab-content" id="vizTabsContent">
+        <!-- Model Accuracy Tab -->
+        <div class="tab-pane fade show active" id="accuracy-content" role="tabpanel">
+            <div class="row">
+                {% if gender_loaded %}
+                <div class="col-lg-6 mb-4">
+                    <div class="accuracy-section fade-in-up">
+                        <h4 class="mb-4"><i class="fas fa-venus-mars text-primary me-2"></i>Gender Prediction Performance</h4>
+                        
+                        {% if gender_accuracy %}
+                        <div class="mb-4">
+                            <label class="mb-2 fw-bold">Overall Accuracy</label>
+                            <div class="progress progress-custom">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {{ (gender_accuracy.overall_accuracy * 100)|round(2) }}%;">
+                                    {{ (gender_accuracy.overall_accuracy * 100)|round(2) }}%
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h5 class="mt-4 mb-3"><i class="fas fa-chart-bar me-2"></i>Accuracy by Gender</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover accuracy-table">
+                                <thead>
+                                    <tr>
+                                        <th>Gender</th>
+                                        <th>Accuracy</th>
+                                        <th>Samples</th>
+                                        <th>Visual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for gender, data in gender_accuracy.gender_accuracies.items() %}
+                                    <tr>
+                                        <td>
+                                            <i class="fas fa-{{ 'mars' if gender == 'Male' else 'venus' }} me-2"></i>
+                                            {{ gender }}
+                                        </td>
+                                        <td><strong>{{ (data.accuracy * 100)|round(2) }}%</strong></td>
+                                        <td>{{ data.count }}</td>
+                                        <td>
+                                            <div class="progress" style="height: 20px; width: 100px;">
+                                                <div class="progress-bar bg-{{ 'info' if gender == 'Male' else 'danger' }}" 
+                                                     style="width: {{ (data.accuracy * 100)|round(0) }}%"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {% if gender_accuracy.pop_accuracies %}
+                        <h5 class="mt-4 mb-3"><i class="fas fa-globe me-2"></i>Accuracy by Population</h5>
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-hover accuracy-table">
+                                <thead class="sticky-top">
+                                    <tr>
+                                        <th>Population</th>
+                                        <th>Accuracy</th>
+                                        <th>Samples</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for pop, data in gender_accuracy.pop_accuracies.items() %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ pop }}</span></td>
+                                        <td>{{ (data.accuracy * 100)|round(2) }}%</td>
+                                        <td>{{ data.count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Unable to analyze Gender Prediction accuracy. The model may not have enough validation data.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 mb-4">
+                    <div class="accuracy-section fade-in-up" style="animation-delay: 0.2s">
+                        <h4 class="mb-4"><i class="fas fa-chart-scatter text-success me-2"></i>Gender Classification Visualization</h4>
+                        {% if gender_viz_data %}
+                        <div class="text-center">
+                            <img src="data:image/png;base64,{{ gender_viz_data }}" class="img-fluid rounded shadow" 
+                                 alt="Gender Classification Visualization" style="max-height: 400px; cursor: pointer;"
+                                 data-bs-toggle="modal" data-bs-target="#plotModal"
+                                 onclick="showPlotModal('Gender Classification in PCA Space', this.src)">
+                            <p class="text-muted mt-2"><small><i class="fas fa-search-plus me-1"></i>Click to enlarge</small></p>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No visualization data available for Gender Classification.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if ancestry_loaded and ancestry_viz_data %}
+                <div class="col-12 mb-4">
+                    <div class="accuracy-section fade-in-up" style="animation-delay: 0.3s">
+                        <h4 class="mb-4"><i class="fas fa-globe-americas text-info me-2"></i>Ancestry Prediction - Population Distribution</h4>
+                        <div class="text-center">
+                            <img src="data:image/png;base64,{{ ancestry_viz_data }}" class="img-fluid rounded shadow" 
+                                 alt="Ancestry PCA Visualization" style="max-height: 500px; cursor: pointer;"
+                                 data-bs-toggle="modal" data-bs-target="#plotModal"
+                                 onclick="showPlotModal('Population Distribution in PCA Space', this.src)">
+                            <p class="text-muted mt-2"><small><i class="fas fa-search-plus me-1"></i>Click to enlarge</small></p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if not gender_loaded and not ancestry_loaded %}
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        <h4 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>No Models Loaded</h4>
+                        <p>You need to load at least one prediction model to view accuracy analysis.</p>
+                        <a href="/" class="btn btn-primary"><i class="fas fa-home me-2"></i>Go to Home Page</a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Model Evaluation Tab -->
+        <div class="tab-pane fade" id="model-eval-content" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control" id="evalSearch" placeholder="Search evaluation plots...">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="filter-tabs">
+                        <button class="filter-tab-eval active" data-category="all">All</button>
+                        <button class="filter-tab-eval" data-category="confusion">Confusion Matrix</button>
+                        <button class="filter-tab-eval" data-category="roc">ROC & Metrics</button>
+                        <button class="filter-tab-eval" data-category="distribution">Distribution</button>
+                        <button class="filter-tab-eval" data-category="clustering">Clustering</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Confusion Matrices -->
+            <div class="category-header">
+                <i class="fas fa-th"></i>
+                <h3>Confusion Matrices</h3>
+            </div>
+            <div class="viz-grid mb-4">
+                {% for plot in ['gender_confusion_matrix.png', 'gender_ensemble_confusion_matrix.png', 'confusion_matrix_english.png'] %}
+                <div class="card plot-card fade-in-up eval-card" data-category="confusion" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/viz/{{ plot }}')">
+                    <span class="badge bg-danger plot-badge">Confusion</span>
+                    <img src="/viz/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_english', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Model prediction evaluation</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- ROC Curves & Metrics -->
+            <div class="category-header">
+                <i class="fas fa-chart-line"></i>
+                <h3>ROC Curves & Performance Metrics</h3>
+            </div>
+            <div class="viz-grid mb-4">
+                {% for plot in ['gender_roc_curve.png', 'gender_feature_importance.png', 'accuracy_by_population_english.png', 'error_by_population_english.png'] %}
+                <div class="card plot-card fade-in-up eval-card" data-category="roc" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/viz/{{ plot }}')">
+                    <span class="badge bg-success plot-badge">Metrics</span>
+                    <img src="/viz/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_english', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Performance metrics visualization</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- PCA & Distribution -->
+            <div class="category-header">
+                <i class="fas fa-chart-area"></i>
+                <h3>PCA & Data Distribution</h3>
+            </div>
+            <div class="viz-grid mb-4">
+                {% for plot in ['gender_pca_english.png', 'gender_pca_3d_english.png', 'gender_pca_distribution.png', 'gender_pca_variance.png', 'gender_pca_pairplot_english.png', 'pca_by_population_gender_english.png', 'pca_dashboard_english.png'] %}
+                <div class="card plot-card fade-in-up eval-card" data-category="distribution" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/viz/{{ plot }}')">
+                    <span class="badge bg-primary plot-badge">PCA</span>
+                    <img src="/viz/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_english', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">PCA and distribution analysis</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- SNP Distribution -->
+            <div class="category-header">
+                <i class="fas fa-dna"></i>
+                <h3>SNP Distribution</h3>
+            </div>
+            <div class="viz-grid mb-4">
+                {% for plot in ['gender_snps_distribution.png', 'gender_snps_distribution_english.png'] %}
+                <div class="card plot-card fade-in-up eval-card" data-category="distribution" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/viz/{{ plot }}')">
+                    <span class="badge bg-warning text-dark plot-badge">SNP</span>
+                    <img src="/viz/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_english', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">SNP distribution analysis</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Clustering & t-SNE -->
+            <div class="category-header">
+                <i class="fas fa-object-group"></i>
+                <h3>Clustering & Dimensionality Reduction</h3>
+            </div>
+            <div class="viz-grid mb-4">
+                {% for plot in ['kmeans_clustering_english.png', 'kmeans_vs_true_gender_english.png', 'tsne_population_english.png', 'tsne_gender_english.png'] %}
+                <div class="card plot-card fade-in-up eval-card" data-category="clustering" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/viz/{{ plot }}')">
+                    <span class="badge bg-info plot-badge">Clustering</span>
+                    <img src="/viz/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_english', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Clustering and t-SNE analysis</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Population Distribution -->
+            <div class="category-header">
+                <i class="fas fa-globe"></i>
+                <h3>Population & Gender Distribution</h3>
+            </div>
+            <div class="viz-grid mb-4">
+                {% for plot in ['population_distribution_english.png', 'gender_by_population_english.png'] %}
+                <div class="card plot-card fade-in-up eval-card" data-category="distribution" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/viz/{{ plot }}')">
+                    <span class="badge bg-secondary plot-badge">Population</span>
+                    <img src="/viz/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_english', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Population and Gender Distribution</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Plot Gallery Tab -->
+        <div class="tab-pane fade" id="plots-content" role="tabpanel">
+            <!-- Search and Filter -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control" id="plotSearch" placeholder="Search plots by name...">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-category="all">All</button>
+                        <button class="filter-tab" data-category="pca">PCA</button>
+                        <button class="filter-tab" data-category="population">Population</button>
+                        <button class="filter-tab" data-category="genetic">Genetic</button>
+                        <button class="filter-tab" data-category="analysis">Analysis</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Plot Categories -->
+            <div class="category-header">
+                <i class="fas fa-project-diagram"></i>
+                <h3>Dimensionality Reduction</h3>
+            </div>
+            <div class="viz-grid mb-4" id="pca-plots">
+                {% for plot in ['3d_pca.png', 'pca_populations.png', 'pca_loadings.png', 'pca_variance.png', 'tsne.png', 'mds.png'] %}
+                <div class="card plot-card fade-in-up" data-category="pca" data-name="{{ plot }}" 
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/plots/{{ plot }}')">
+                    <span class="badge bg-primary plot-badge">PCA</span>
+                    <img src="/plots/{{ plot }}" alt="{{ plot }}" 
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Dimensionality reduction visualization</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="category-header">
+                <i class="fas fa-globe-americas"></i>
+                <h3>Population Analysis</h3>
+            </div>
+            <div class="viz-grid mb-4" id="population-plots">
+                {% for plot in ['population_distances.png', 'fst_plot.png', 'genetic_distance.png', 'admixture_structure.png'] %}
+                <div class="card plot-card fade-in-up" data-category="population" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/plots/{{ plot }}')">
+                    <span class="badge bg-success plot-badge">Population</span>
+                    <img src="/plots/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Population genetics analysis</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="category-header">
+                <i class="fas fa-dna"></i>
+                <h3>Genetic Markers</h3>
+            </div>
+            <div class="viz-grid mb-4" id="genetic-plots">
+                {% for plot in ['manhattan_plot.png', 'circular_manhattan.png', 'qq_plot.png', 'snp_density.png', 'allele_frequency.png', 'chromosome_distribution.png'] %}
+                <div class="card plot-card fade-in-up" data-category="genetic" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/plots/{{ plot }}')">
+                    <span class="badge bg-danger plot-badge">Genetic</span>
+                    <img src="/plots/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Genetic marker analysis</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="category-header">
+                <i class="fas fa-chart-line"></i>
+                <h3>Statistical Analysis</h3>
+            </div>
+            <div class="viz-grid mb-4" id="analysis-plots">
+                {% for plot in ['learning_curves.png', 'effect_sizes.png', 'heterozygosity.png', 'ld_decay.png', 'ld_heatmap.png', 'genotype_heatmap.png'] %}
+                <div class="card plot-card fade-in-up" data-category="analysis" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/plots/{{ plot }}')">
+                    <span class="badge bg-warning text-dark plot-badge">Analysis</span>
+                    <img src="/plots/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Statistical and model analysis</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="category-header">
+                <i class="fas fa-link"></i>
+                <h3>Haplotype & Network Analysis</h3>
+            </div>
+            <div class="viz-grid mb-4" id="haplotype-plots">
+                {% for plot in ['haplotype_blocks.png', 'haplotype_network.png', 'genome_coverage.png', 'dashboard.png'] %}
+                <div class="card plot-card fade-in-up" data-category="analysis" data-name="{{ plot }}"
+                     style="animation-delay: {{ loop.index * 0.1 }}s"
+                     data-bs-toggle="modal" data-bs-target="#plotModal"
+                     onclick="showPlotModal('{{ plot|replace('.png', '')|replace('_', ' ')|title }}', '/plots/{{ plot }}')">
+                    <span class="badge bg-info plot-badge">Haplotype</span>
+                    <img src="/plots/{{ plot }}" alt="{{ plot }}"
+                         onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text={{ plot|replace('.png', '') }}';">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ plot|replace('.png', '')|replace('_', ' ')|title }}</h6>
+                        <p class="card-text">Haplotype and network analysis</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- PCA Analysis Tab -->
+        <div class="tab-pane fade" id="pca-content" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-8 mb-4">
+                    <div class="accuracy-section">
+                        <h4 class="mb-4"><i class="fas fa-cube text-primary me-2"></i>3D PCA Visualization</h4>
+                        <div class="text-center">
+                            <img src="/plots/3d_pca.png" class="img-fluid rounded shadow" 
+                                 alt="3D PCA" style="max-height: 500px; cursor: pointer;"
+                                 data-bs-toggle="modal" data-bs-target="#plotModal"
+                                 onclick="showPlotModal('3D PCA Visualization', this.src)"
+                                 onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-info\'><i class=\'fas fa-info-circle me-2\'></i>3D PCA plot not available</div>';">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 mb-4">
+                    <div class="accuracy-section h-100">
+                        <h4 class="mb-4"><i class="fas fa-chart-pie text-success me-2"></i>PCA Variance Explained</h4>
+                        <img src="/plots/pca_variance.png" class="img-fluid rounded shadow mb-3" 
+                             alt="PCA Variance"
+                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-info\'><i class=\'fas fa-info-circle me-2\'></i>Variance plot not available</div>';">
+                        <p class="text-muted small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Shows the proportion of variance explained by each principal component, helping identify which components capture the most genetic variation.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-lg-6 mb-4">
+                    <div class="accuracy-section">
+                        <h4 class="mb-4"><i class="fas fa-vector-square text-info me-2"></i>PCA Loadings</h4>
+                        <img src="/plots/pca_loadings.png" class="img-fluid rounded shadow" 
+                             alt="PCA Loadings"
+                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-info\'><i class=\'fas fa-info-circle me-2\'></i>Loadings plot not available</div>';">
+                        <p class="text-muted small mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Feature loadings show which SNPs contribute most to each principal component.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-lg-6 mb-4">
+                    <div class="accuracy-section">
+                        <h4 class="mb-4"><i class="fas fa-compress-alt text-warning me-2"></i>t-SNE Embedding</h4>
+                        <img src="/plots/tsne.png" class="img-fluid rounded shadow" 
+                             alt="t-SNE"
+                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-info\'><i class=\'fas fa-info-circle me-2\'></i>t-SNE plot not available</div>';">
+                        <p class="text-muted small mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            t-SNE provides non-linear dimensionality reduction to reveal cluster structures.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plot Modal -->
+<div class="modal fade" id="plotModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-plot modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="plotModalTitle">Plot</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <img src="" id="plotModalImage" class="img-fluid" alt="Plot">
+            </div>
+            <div class="modal-footer">
+                <a href="" id="plotDownloadBtn" class="btn btn-primary" download>
+                    <i class="fas fa-download me-1"></i> Download
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Show plot in modal
+    function showPlotModal(title, src) {
+        document.getElementById('plotModalTitle').textContent = title;
+        document.getElementById('plotModalImage').src = src;
+        document.getElementById('plotDownloadBtn').href = src;
+    }
+    
+    // Search functionality for Plot Gallery
+    document.getElementById('plotSearch').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        document.querySelectorAll('#plots-content .plot-card').forEach(card => {
+            const name = card.dataset.name.toLowerCase();
+            const title = card.querySelector('.card-title').textContent.toLowerCase();
+            if (name.includes(searchTerm) || title.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+    
+    // Search functionality for Model Evaluation
+    document.getElementById('evalSearch').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        document.querySelectorAll('.eval-card').forEach(card => {
+            const name = card.dataset.name.toLowerCase();
+            const title = card.querySelector('.card-title').textContent.toLowerCase();
+            if (name.includes(searchTerm) || title.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+    
+    // Filter tabs for Plot Gallery
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            // Update active state
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            const category = this.dataset.category;
+            document.querySelectorAll('#plots-content .plot-card').forEach(card => {
+                if (category === 'all' || card.dataset.category === category) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+    
+    // Filter tabs for Model Evaluation
+    document.querySelectorAll('.filter-tab-eval').forEach(tab => {
+        tab.addEventListener('click', function() {
+            // Update active state
+            document.querySelectorAll('.filter-tab-eval').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            const category = this.dataset.category;
+            document.querySelectorAll('.eval-card').forEach(card => {
+                if (category === 'all' || card.dataset.category === category) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+    
+    // Animate elements on scroll
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+    
+    document.querySelectorAll('.fade-in-up').forEach(el => {
+        observer.observe(el);
+    });
+</script>
+{% endblock %}
