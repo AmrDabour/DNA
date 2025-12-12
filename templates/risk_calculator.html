@@ -348,6 +348,20 @@
         border: 1px solid var(--glass-border);
     }
     
+    /* Table header gradient - applies to entire row */
+    .table-header-gradient {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+        color: white !important;
+    }
+    
+    .table-header-gradient th {
+        background: transparent !important;
+        border: none !important;
+        color: white !important;
+        font-weight: 600;
+        padding: 0.75rem;
+    }
+    
     .modal-header {
         border-bottom-color: var(--glass-border);
         background: rgba(99, 102, 241, 0.05);
@@ -650,7 +664,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="table-responsive">
                         <table class="table table-sm table-dark">
                             <thead>
-                                <tr>
+                                <tr class="table-header-gradient">
                                     <th>SNP</th>
                                     <th>Gene</th>
                                     <th>Your Genotype</th>

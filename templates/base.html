@@ -34,6 +34,19 @@
             overflow: auto !important;
             padding-right: 0 !important;
         }
+        
+        /* Force remove modal backdrop when modal is not open */
+        body:not(.modal-open) .modal-backdrop {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        
+        /* Remove any lingering backdrops */
+        .modal-backdrop.fade.show:not(.modal-open) {
+            display: none !important;
+        }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -402,10 +415,18 @@
 
         // Clean up any stuck modal backdrops on page load
         document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            // Remove all modal backdrops immediately
+            document.querySelectorAll('.modal-backdrop').forEach(el => {
+                el.remove();
+            });
+            // Remove modal-open class and reset body styles
             document.body.classList.remove('modal-open');
             document.body.style.removeProperty('overflow');
             document.body.style.removeProperty('padding-right');
+            // Force remove any lingering backdrops
+            setTimeout(function() {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            }, 100);
         });
 
         // Dark mode toggle
@@ -490,11 +511,25 @@
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         const el = entry.target;
+                        const originalText = el.textContent;
                         const target = parseInt(el.getAttribute('data-count') || el.textContent);
                         if (!isNaN(target) && typeof countUp !== 'undefined') {
+                            // Detect suffix from original text (% or /7 or K+ or M+)
+                            let suffix = '';
+                            if (originalText.includes('%')) {
+                                suffix = '%';
+                            } else if (originalText.includes('/7')) {
+                                suffix = '/7';
+                            } else if (originalText.includes('M+')) {
+                                suffix = 'M+';
+                            } else if (originalText.includes('K+')) {
+                                suffix = 'K+';
+                            }
+                            
                             const counter = new countUp.CountUp(el, target, {
                                 duration: 2,
-                                enableScrollSpy: false
+                                enableScrollSpy: false,
+                                suffix: suffix
                             });
                             counter.start();
                         }
@@ -733,53 +768,91 @@
     </style>
     
     <script>
-        // Clean up any stuck modal backdrops on page load
+        // Aggressive modal backdrop cleanup - runs immediately
         (function() {
-            // Remove all modal backdrops
-            document.querySelectorAll('.modal-backdrop').forEach(function(el) {
-                el.remove();
-            });
-            // Remove custom backdrops
-            document.querySelectorAll('.custom-backdrop').forEach(function(el) {
-                el.classList.remove('show');
-            });
-            // Reset body state
-            document.body.classList.remove('modal-open');
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
-            document.body.style.removeProperty('overflow');
-            document.body.style.removeProperty('padding-right');
+            function removeAllBackdrops() {
+                // Remove all modal backdrops
+                document.querySelectorAll('.modal-backdrop').forEach(function(el) {
+                    el.remove();
+                });
+                // Remove custom backdrops
+                document.querySelectorAll('.custom-backdrop').forEach(function(el) {
+                    el.classList.remove('show');
+                    el.remove();
+                });
+                // Reset body state
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                
+                // Hide any modals that might be stuck open
+                document.querySelectorAll('.modal.show').forEach(function(modal) {
+                    modal.classList.remove('show');
+                    modal.style.display = 'none';
+                    modal.setAttribute('aria-hidden', 'true');
+                });
+            }
             
-            // Hide any modals that might be stuck open
-            document.querySelectorAll('.modal.show').forEach(function(modal) {
-                modal.classList.remove('show');
-                modal.style.display = 'none';
-                modal.setAttribute('aria-hidden', 'true');
-            });
+            // Run immediately
+            removeAllBackdrops();
+            
+            // Run on DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', removeAllBackdrops);
+            } else {
+                removeAllBackdrops();
+            }
+            
+            // Global modal cleanup function available to all pages
+            window.cleanupAllModals = removeAllBackdrops;
         })();
         
-        // Global modal cleanup function available to all pages
-        window.cleanupAllModals = function() {
-            document.querySelectorAll('.modal-backdrop').forEach(function(el) {
-                el.remove();
+        // MutationObserver to catch dynamically added backdrops
+        const backdropObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        // Check if the added node is a backdrop
+                        if (node.classList && node.classList.contains('modal-backdrop')) {
+                            // If body doesn't have modal-open, remove it immediately
+                            if (!document.body.classList.contains('modal-open')) {
+                                node.remove();
+                            }
+                        }
+                        // Check if backdrop was added inside the node
+                        const backdrops = node.querySelectorAll && node.querySelectorAll('.modal-backdrop');
+                        if (backdrops && backdrops.length > 0 && !document.body.classList.contains('modal-open')) {
+                            backdrops.forEach(function(backdrop) {
+                                backdrop.remove();
+                            });
+                        }
+                    }
+                });
             });
-            document.querySelectorAll('.custom-backdrop').forEach(function(el) {
-                el.classList.remove('show');
-            });
-            document.body.classList.remove('modal-open');
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
-        };
+        });
         
-        // Periodically check for stuck backdrops (safety net)
+        // Start observing the document body for added nodes
+        backdropObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        
+        // Periodically check for stuck backdrops (safety net - runs every 500ms)
         setInterval(function() {
             // If there's a backdrop but no visible modal, clean up
             const hasBackdrop = document.querySelector('.modal-backdrop');
             const hasVisibleModal = document.querySelector('.modal.show');
             if (hasBackdrop && !hasVisibleModal) {
-                window.cleanupAllModals();
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
             }
-        }, 2000);
+            // Also check if body doesn't have modal-open but backdrop exists
+            if (!document.body.classList.contains('modal-open')) {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            }
+        }, 500);
     </script>
     
     {% block extra_js %}{% endblock %}

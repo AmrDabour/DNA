@@ -127,7 +127,7 @@
 </div>
 
 <!-- SNP Detail Modal -->
-<div class="modal fade" id="snpModal" tabindex="-1" aria-labelledby="snpModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="snpModal" tabindex="-1" aria-labelledby="snpModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
@@ -681,15 +681,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     window.showSNPDetail = function(rsId) {
+        // Show loading state
+        const modalElement = document.getElementById('snpModal');
+        const modalBody = document.getElementById('modal-body');
+        modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading SNP details...</p></div>';
+        
+        // Show modal using Bootstrap API
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
         fetch(`/api/snp/${rsId}`)
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.success) {
                     const snp = data.snp;
                     document.getElementById('modal-rsid').textContent = snp.rs_id;
                     document.getElementById('dbsnp-link').href = `https://www.ncbi.nlm.nih.gov/snp/${snp.rs_id}`;
                     
-                    document.getElementById('modal-body').innerHTML = `
+                    modalBody.innerHTML = `
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="detail-section">
@@ -697,9 +711,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <table class="table table-sm">
                                         <tr><td>RS ID</td><td><strong>${snp.rs_id}</strong></td></tr>
                                         <tr><td>Chromosome</td><td>Chr ${snp.chromosome}</td></tr>
-                                        <tr><td>Position</td><td>${snp.position?.toLocaleString() || 'N/A'}</td></tr>
-                                        <tr><td>Gene</td><td>${snp.gene_name} (${snp.gene_symbol})</td></tr>
-                                        <tr><td>Function</td><td>${snp.function_class}</td></tr>
+                                        <tr><td>Position</td><td>${snp.position ? snp.position.toLocaleString() : 'N/A'}</td></tr>
+                                        <tr><td>Gene</td><td>${snp.gene_name || 'N/A'} ${snp.gene_symbol ? '(' + snp.gene_symbol + ')' : ''}</td></tr>
+                                        <tr><td>Function</td><td>${snp.function_class || 'N/A'}</td></tr>
                                     </table>
                                 </div>
                             </div>
@@ -707,9 +721,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="detail-section">
                                     <h6><i class="fas fa-dna me-2"></i>Allele Information</h6>
                                     <table class="table table-sm">
-                                        <tr><td>Reference</td><td><strong>${snp.ref_allele}</strong></td></tr>
-                                        <tr><td>Alternative</td><td><strong>${snp.alt_allele}</strong></td></tr>
-                                        <tr><td>Minor Allele</td><td>${snp.minor_allele}</td></tr>
+                                        <tr><td>Reference</td><td><strong>${snp.ref_allele || 'N/A'}</strong></td></tr>
+                                        <tr><td>Alternative</td><td><strong>${snp.alt_allele || 'N/A'}</strong></td></tr>
+                                        <tr><td>Minor Allele</td><td>${snp.minor_allele || 'N/A'}</td></tr>
                                         <tr><td>MAF</td><td>${snp.maf ? (snp.maf * 100).toFixed(1) + '%' : 'N/A'}</td></tr>
                                         ${snp.risk_allele ? `<tr><td>Risk Allele</td><td class="text-danger">${snp.risk_allele}</td></tr>` : ''}
                                         ${snp.odds_ratio ? `<tr><td>Odds Ratio</td><td>${snp.odds_ratio}</td></tr>` : ''}
@@ -721,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="detail-section">
                             <h6><i class="fas fa-heartbeat me-2"></i>Clinical Significance</h6>
                             <span class="significance-badge ${getSignificanceClass(snp.clinical_significance)} me-2">
-                                ${snp.clinical_significance}
+                                ${snp.clinical_significance || 'Unknown'}
                             </span>
                             ${snp.population_specific ? `<span class="text-muted">${snp.population_specific}</span>` : ''}
                         </div>
@@ -729,12 +743,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="detail-section">
                             <h6><i class="fas fa-user me-2"></i>Associated Traits</h6>
                             <div>
-                                ${(snp.associated_traits || []).map(t => `<span class="trait-badge">${t}</span>`).join(' ')}
-                                ${snp.associated_traits?.length === 0 ? '<span class="text-muted">No traits associated</span>' : ''}
+                                ${(snp.associated_traits && snp.associated_traits.length > 0) ? snp.associated_traits.map(t => `<span class="trait-badge">${t}</span>`).join(' ') : '<span class="text-muted">No traits associated</span>'}
                             </div>
                         </div>
                         
-                        ${snp.disease_associations?.length > 0 ? `
+                        ${snp.disease_associations && snp.disease_associations.length > 0 ? `
                         <div class="detail-section">
                             <h6><i class="fas fa-file-medical me-2"></i>Disease Associations</h6>
                             <div>
@@ -753,26 +766,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="text-muted">${snp.source || 'dbSNP'}</span>
                         </div>
                     `;
-                    
-                    // Show the modal manually without Bootstrap's backdrop
-                    const modalElement = document.getElementById('snpModal');
-                    const customBackdrop = document.getElementById('customBackdrop');
-                    
-                    // Remove any Bootstrap backdrops that might exist
-                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                    
-                    // Show our custom backdrop
-                    customBackdrop.classList.add('show');
-                    
-                    // Show modal manually
-                    modalElement.classList.add('show');
-                    modalElement.style.display = 'block';
-                    modalElement.setAttribute('aria-hidden', 'false');
-                    document.body.classList.add('modal-open');
+                } else {
+                    modalBody.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            ${data.error || 'Failed to load SNP details. Please try again.'}
+                        </div>
+                    `;
                 }
             })
             .catch(err => {
                 console.error('Error loading SNP details:', err);
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error loading SNP details: ${err.message || 'Unknown error'}
+                    </div>
+                `;
             });
     };
     
@@ -781,40 +791,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // Global function to close modal
     window.closeSnpModal = function() {
         const modalElement = document.getElementById('snpModal');
-        const customBackdrop = document.getElementById('customBackdrop');
-        
-        // Hide modal
-        modalElement.classList.remove('show');
-        modalElement.style.display = 'none';
-        modalElement.setAttribute('aria-hidden', 'true');
-        
-        // Hide our custom backdrop
-        customBackdrop.classList.remove('show');
-        
-        // Remove any Bootstrap backdrops that might have appeared
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        } else {
+            // Fallback if Bootstrap modal instance doesn't exist
+            modalElement.classList.remove('show');
+            modalElement.style.display = 'none';
+            modalElement.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        }
+    };
+    
+    // Clean up modal backdrop when modal is hidden
+    document.getElementById('snpModal').addEventListener('hidden.bs.modal', function() {
         document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-        
-        // Reset body
         document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
         document.body.style.paddingRight = '';
-    };
-    
-    // Handle Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const modalElement = document.getElementById('snpModal');
-            if (modalElement.classList.contains('show')) {
-                closeSnpModal();
-            }
-        }
-    });
-    
-    // Click outside modal content to close
-    document.getElementById('snpModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeSnpModal();
-        }
     });
     
     // Safety cleanup on page load

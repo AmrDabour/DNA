@@ -137,7 +137,7 @@
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
-                                <tr>
+                                <tr class="table-header-gradient">
                                     <th>Sample ID</th>
                                     <th>Type</th>
                                     <th>Gender</th>
@@ -273,6 +273,35 @@
     
     .profile-card-body {
         padding: 1.5rem;
+    }
+    
+    /* Table header gradient - applies to entire row */
+    .profile-card-body .table thead tr.table-header-gradient {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%) !important;
+        background-image: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%) !important;
+        color: white !important;
+    }
+    
+    .profile-card-body .table thead tr.table-header-gradient th {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        border: none !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        font-weight: 600;
+        padding: 0.75rem;
+    }
+    
+    /* Override Bootstrap table styles for gradient header */
+    .profile-card-body table.table thead tr.table-header-gradient th {
+        background-color: transparent !important;
+        background-image: none !important;
+    }
+    
+    /* Ensure gradient shows on hover too */
+    .profile-card-body .table.table-hover thead tr.table-header-gradient:hover {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%) !important;
     }
 </style>
 {% endblock %}

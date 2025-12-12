@@ -78,6 +78,20 @@ class SexPredictor(BasePredictor):
         # Initialize the base class
         super().__init__(model_path, features_path)
 
+        # Normalize gender column name (handle both "gender" and "SEX")
+        if self.features_df is not None:
+            if "SEX" in self.features_df.columns and "gender" not in self.features_df.columns:
+                self.features_df["gender"] = self.features_df["SEX"]
+            elif "gender" in self.features_df.columns and "SEX" not in self.features_df.columns:
+                self.features_df["SEX"] = self.features_df["gender"]
+            
+            # Create Population_encoded if Population exists but Population_encoded doesn't
+            # This is needed for models that expect Population_encoded as a feature
+            if "Population" in self.features_df.columns and "Population_encoded" not in self.features_df.columns:
+                from sklearn.preprocessing import LabelEncoder
+                le = LabelEncoder()
+                self.features_df["Population_encoded"] = le.fit_transform(self.features_df["Population"])
+
         # Load the PCA model (if available)
         self.pca = None
         if pca_path and os.path.exists(pca_path):
@@ -156,8 +170,16 @@ class SexPredictor(BasePredictor):
         """
         Analyze and display prediction accuracy statistics for Gender Prediction
         """
-        if self.features_df is None or "gender" not in self.features_df.columns:
+        # Check for gender column (normalized in __init__)
+        if self.features_df is None:
             return None
+        
+        # Ensure gender column exists (normalize if needed)
+        if "gender" not in self.features_df.columns:
+            if "SEX" in self.features_df.columns:
+                self.features_df["gender"] = self.features_df["SEX"]
+            else:
+                return None
 
         # Predict gender for all samples
         feature_cols = [
@@ -227,8 +249,16 @@ class SexPredictor(BasePredictor):
         """
         Generate visualization for gender predictions using PCA components
         """
-        if self.features_df is None or "gender" not in self.features_df.columns:
+        # Check for gender column (normalized in __init__)
+        if self.features_df is None:
             return None
+        
+        # Ensure gender column exists (normalize if needed)
+        if "gender" not in self.features_df.columns:
+            if "SEX" in self.features_df.columns:
+                self.features_df["gender"] = self.features_df["SEX"]
+            else:
+                return None
 
         # Extract data
         pc_columns = [col for col in self.features_df.columns if col.startswith("PC_")]
@@ -461,9 +491,14 @@ class GeneticPredictor:
                 if os.path.exists(ensemble_model_path)
                 else model_path
             )
-            chosen_features_path = (
-                prediction_path if os.path.exists(prediction_path) else features_path
-            )
+            # Prefer features_pca.csv over predictions.csv for visualization/accuracy analysis
+            # as it's more likely to have the required columns (gender/SEX column)
+            if os.path.exists(features_path):
+                chosen_features_path = features_path
+            elif os.path.exists(prediction_path):
+                chosen_features_path = prediction_path
+            else:
+                chosen_features_path = None
 
             # Initialize the gender predictor
             self.sex_predictor = SexPredictor(

@@ -160,9 +160,16 @@
         pointer-events: auto !important;
     }
     
-    /* Ensure modal backdrop is properly layered */
+    /* Ensure modal backdrop is properly layered and removed when not needed */
     .modal-backdrop {
         z-index: 1040 !important;
+    }
+    
+    /* Remove backdrop when modal is not open */
+    body:not(.modal-open) .modal-backdrop {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
     }
     
     .modal {
