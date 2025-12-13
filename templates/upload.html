@@ -13,19 +13,19 @@
                         <i class="fas fa-dna"></i>
                     </div>
                     <h2 class="fw-bold mb-2">Upload SNP Data</h2>
-                    <p class="text-muted mb-0">Upload your CSV file to analyze genetic data</p>
+                    <p class="text-muted mb-0">Upload your CSV or PED file to analyze genetic data</p>
                 </div>
                 
                 <form method="post" enctype="multipart/form-data" id="uploadForm">
                     <!-- Drag & Drop Zone -->
                     <div class="upload-zone" id="dropZone">
-                        <input class="d-none" type="file" id="fileInput" name="file" accept=".csv">
+                        <input class="d-none" type="file" id="fileInput" name="file" accept=".csv,.ped">
                         <div class="upload-icon">
                             <i class="fas fa-cloud-upload-alt"></i>
                         </div>
-                        <h5 class="fw-bold mb-2">Drag & Drop your CSV file</h5>
+                        <h5 class="fw-bold mb-2">Drag & Drop your CSV or PED file</h5>
                         <p class="text-muted mb-3">or click to browse</p>
-                        <span class="format-badge"><i class="fas fa-file-csv me-1"></i>.csv format</span>
+                        <span class="format-badge"><i class="fas fa-file-csv me-1"></i>.csv / .ped format</span>
                     </div>
                     
                     <!-- File Preview -->
@@ -362,8 +362,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle file
     function handleFile(file) {
-        if (!file.name.endsWith('.csv')) {
-            alert('Please upload a CSV file');
+        if (!file.name.endsWith('.csv') && !file.name.endsWith('.ped')) {
+            alert('Please upload a CSV or PED file');
             return;
         }
         
