@@ -9,6 +9,37 @@ from . import samples_bp
 from .samples_routes import POPULATION_INFO
 
 
+def get_snp_column_name(df):
+    """Detect the SNP column name in the dataframe"""
+    possible_names = ['SNP', 'snp', 'SNP_ID', 'snp_id', 'rsid', 'RS_ID', 'rs_id', 'RSID', 'ID', 'id']
+    for col_name in possible_names:
+        if col_name in df.columns:
+            return col_name
+    return None
+
+
+def get_allele_columns(df):
+    """Detect allele column names in the dataframe"""
+    allele1_col = None
+    allele2_col = None
+    
+    # Try different possible column names
+    possible_allele1 = ['Allele1', 'allele1', 'ALLELE1', 'A1', 'a1', 'REF', 'ref', 'Reference']
+    possible_allele2 = ['Allele2', 'allele2', 'ALLELE2', 'A2', 'a2', 'ALT', 'alt', 'Alternative']
+    
+    for col in possible_allele1:
+        if col in df.columns:
+            allele1_col = col
+            break
+    
+    for col in possible_allele2:
+        if col in df.columns:
+            allele2_col = col
+            break
+    
+    return allele1_col, allele2_col
+
+
 # ============================================================
 # SNP Query Feature - Query specific SNP values from sample files
 # ============================================================
@@ -84,15 +115,16 @@ def query_snp():
         # Load the sample data
         df = pd.read_csv(sample_file)
         
-        # Check if SNP column exists
-        if 'SNP' not in df.columns:
+        # Detect SNP column name
+        snp_col = get_snp_column_name(df)
+        if not snp_col:
             return jsonify({
                 "success": False,
-                "error": "Invalid file format: SNP column not found"
+                "error": "Invalid file format: SNP column not found. Expected columns: SNP, snp, SNP_ID, rsid, RS_ID, etc."
             })
         
         # Find the SNP
-        snp_data = df[df['SNP'] == snp_id]
+        snp_data = df[df[snp_col] == snp_id]
         
         if snp_data.empty:
             return jsonify({
@@ -103,18 +135,71 @@ def query_snp():
         # Get the first match
         row = snp_data.iloc[0]
         
+        # Get allele column names
+        allele1_col, allele2_col = get_allele_columns(df)
+        
+        # Get patient info from first row of dataframe (gender/population are usually the same across all rows)
+        first_row = df.iloc[0]
+        patient_id = str(first_row['Patient_ID']) if 'Patient_ID' in first_row and pd.notna(first_row['Patient_ID']) else None
+        population = str(first_row['Population']) if 'Population' in first_row and pd.notna(first_row['Population']) else None
+        
+        # Get gender from first row (check multiple possible column names and handle different formats)
+        gender = None
+        sex_code = None
+        
+        # Try different column names
+        if 'gender' in first_row and pd.notna(first_row['gender']):
+            sex_code = first_row['gender']
+        elif 'Sex' in first_row and pd.notna(first_row['Sex']):
+            sex_code = first_row['Sex']
+        elif 'sex' in first_row and pd.notna(first_row['sex']):
+            sex_code = first_row['sex']
+        elif 'SEX' in first_row and pd.notna(first_row['SEX']):
+            sex_code = first_row['SEX']
+        
+        # Convert to gender string (handle both numeric and string values)
+        if sex_code is not None:
+            try:
+                # Try to convert to int if it's a string
+                if isinstance(sex_code, str):
+                    sex_code = int(sex_code)
+                # Check for numeric codes
+                if sex_code == 2 or sex_code == '2' or str(sex_code).upper() == 'F' or str(sex_code).upper() == 'FEMALE':
+                    gender = "Female"
+                elif sex_code == 1 or sex_code == '1' or str(sex_code).upper() == 'M' or str(sex_code).upper() == 'MALE':
+                    gender = "Male"
+            except (ValueError, TypeError):
+                # If conversion fails, check string values directly
+                sex_str = str(sex_code).upper()
+                if sex_str in ['F', 'FEMALE', '2']:
+                    gender = "Female"
+                elif sex_str in ['M', 'MALE', '1']:
+                    gender = "Male"
+        
+        # Get chromosome and position (try different column names)
+        chr_col = None
+        pos_col = None
+        for col in ['CHR', 'Chr', 'chr', 'Chromosome', 'chromosome', 'CHROMOSOME']:
+            if col in row:
+                chr_col = col
+                break
+        for col in ['POS', 'Pos', 'pos', 'Position', 'position', 'POSITION']:
+            if col in row:
+                pos_col = col
+                break
+        
         # Build result
         result = {
             "success": True,
             "snp_id": snp_id,
-            "chromosome": int(row['CHR']) if 'CHR' in row else None,
-            "position": int(row['POS']) if 'POS' in row else None,
-            "allele1": str(row['Allele1']) if 'Allele1' in row else None,
-            "allele2": str(row['Allele2']) if 'Allele2' in row else None,
-            "genotype": f"{row['Allele1']}/{row['Allele2']}" if 'Allele1' in row and 'Allele2' in row else None,
-            "patient_id": str(row['Patient_ID']) if 'Patient_ID' in row else None,
-            "population": str(row['Population']) if 'Population' in row else None,
-            "gender": "Female" if row.get('gender') == 2 else "Male" if row.get('gender') == 1 else None
+            "chromosome": int(row[chr_col]) if chr_col and pd.notna(row[chr_col]) else None,
+            "position": int(row[pos_col]) if pos_col and pd.notna(row[pos_col]) else None,
+            "allele1": str(row[allele1_col]) if allele1_col and pd.notna(row[allele1_col]) else None,
+            "allele2": str(row[allele2_col]) if allele2_col and pd.notna(row[allele2_col]) else None,
+            "genotype": f"{row[allele1_col]}/{row[allele2_col]}" if allele1_col and allele2_col and pd.notna(row[allele1_col]) and pd.notna(row[allele2_col]) else None,
+            "patient_id": patient_id,
+            "population": population,
+            "gender": gender
         }
         
         # Add population description if available
@@ -159,10 +244,12 @@ def get_sample_snps():
         # Load the sample data
         df = pd.read_csv(sample_file)
         
-        if 'SNP' not in df.columns:
+        # Detect SNP column name
+        snp_col = get_snp_column_name(df)
+        if not snp_col:
             return jsonify({
                 "success": False,
-                "error": "Invalid file format: SNP column not found"
+                "error": "Invalid file format: SNP column not found. Expected columns: SNP, snp, SNP_ID, rsid, RS_ID, etc."
             })
         
         # Get sample info
@@ -172,7 +259,7 @@ def get_sample_snps():
         gender = "Female" if sex_code == 2 else "Male" if sex_code == 1 else "Unknown"
         
         # Get SNP list
-        snps = df['SNP'].tolist()
+        snps = df[snp_col].tolist()
         
         return jsonify({
             "success": True,
@@ -218,30 +305,49 @@ def query_multiple_snps():
         # Load the sample data
         df = pd.read_csv(sample_file)
         
-        if 'SNP' not in df.columns:
+        # Detect SNP column name
+        snp_col = get_snp_column_name(df)
+        if not snp_col:
             return jsonify({
                 "success": False,
-                "error": "Invalid file format: SNP column not found"
+                "error": "Invalid file format: SNP column not found. Expected columns: SNP, snp, SNP_ID, rsid, RS_ID, etc."
             })
+        
+        # Get allele column names
+        allele1_col, allele2_col = get_allele_columns(df)
+        
+        # Get chromosome and position column names
+        chr_col = None
+        pos_col = None
+        for col in ['CHR', 'Chr', 'chr', 'Chromosome', 'chromosome', 'CHROMOSOME']:
+            if col in df.columns:
+                chr_col = col
+                break
+        for col in ['POS', 'Pos', 'pos', 'Position', 'position', 'POSITION']:
+            if col in df.columns:
+                pos_col = col
+                break
         
         # Query all SNPs
         results = []
         not_found = []
         
         for snp_id in snp_ids:
-            snp_data = df[df['SNP'] == snp_id]
+            snp_data = df[df[snp_col] == snp_id]
             
             if snp_data.empty:
                 not_found.append(snp_id)
             else:
                 row = snp_data.iloc[0]
+                allele1 = str(row[allele1_col]) if allele1_col and allele1_col in row and pd.notna(row[allele1_col]) else None
+                allele2 = str(row[allele2_col]) if allele2_col and allele2_col in row and pd.notna(row[allele2_col]) else None
                 results.append({
                     "snp_id": snp_id,
-                    "chromosome": int(row['CHR']) if 'CHR' in row else None,
-                    "position": int(row['POS']) if 'POS' in row else None,
-                    "allele1": str(row['Allele1']) if 'Allele1' in row else None,
-                    "allele2": str(row['Allele2']) if 'Allele2' in row else None,
-                    "genotype": f"{row['Allele1']}/{row['Allele2']}" if 'Allele1' in row and 'Allele2' in row else None
+                    "chromosome": int(row[chr_col]) if chr_col and chr_col in row and pd.notna(row[chr_col]) else None,
+                    "position": int(row[pos_col]) if pos_col and pos_col in row and pd.notna(row[pos_col]) else None,
+                    "allele1": allele1,
+                    "allele2": allele2,
+                    "genotype": f"{allele1}/{allele2}" if allele1 and allele2 else None
                 })
         
         return jsonify({
@@ -283,14 +389,22 @@ def get_common_snps():
         
         # Get SNPs from first file
         first_df = pd.read_csv(sample_files[0])
-        common_snps = set(first_df['SNP'].tolist())
+        first_snp_col = get_snp_column_name(first_df)
+        if not first_snp_col:
+            return jsonify({
+                "success": False,
+                "error": "Invalid file format: SNP column not found in first file"
+            })
+        common_snps = set(first_df[first_snp_col].tolist())
         
         # Find intersection with other files
         for file_path in sample_files[1:]:
             if os.path.exists(file_path):
                 df = pd.read_csv(file_path)
-                file_snps = set(df['SNP'].tolist())
-                common_snps = common_snps.intersection(file_snps)
+                snp_col = get_snp_column_name(df)
+                if snp_col:
+                    file_snps = set(df[snp_col].tolist())
+                    common_snps = common_snps.intersection(file_snps)
         
         common_snps_list = sorted(list(common_snps))
         
@@ -337,6 +451,13 @@ def build_dataset():
             
             df = pd.read_csv(file_path)
             
+            # Detect column names
+            snp_col = get_snp_column_name(df)
+            if not snp_col:
+                continue  # Skip files without SNP column
+            
+            allele1_col, allele2_col = get_allele_columns(df)
+            
             # Get sample info
             patient_id = df['Patient_ID'].iloc[0] if 'Patient_ID' in df.columns else os.path.basename(file_path).replace('.csv', '')
             population = df['Population'].iloc[0] if 'Population' in df.columns else "Unknown"
@@ -356,7 +477,7 @@ def build_dataset():
             
             # Get SNP values
             for snp_id in snp_ids:
-                snp_data = df[df['SNP'] == snp_id]
+                snp_data = df[df[snp_col] == snp_id]
                 
                 if snp_data.empty:
                     if encoding == 'numeric':
@@ -365,8 +486,8 @@ def build_dataset():
                         row[snp_id] = "NA"
                 else:
                     snp_row = snp_data.iloc[0]
-                    allele1 = str(snp_row['Allele1']) if 'Allele1' in snp_row else '?'
-                    allele2 = str(snp_row['Allele2']) if 'Allele2' in snp_row else '?'
+                    allele1 = str(snp_row[allele1_col]) if allele1_col and allele1_col in snp_row and pd.notna(snp_row[allele1_col]) else '?'
+                    allele2 = str(snp_row[allele2_col]) if allele2_col and allele2_col in snp_row and pd.notna(snp_row[allele2_col]) else '?'
                     
                     if encoding == 'genotype':
                         row[snp_id] = f"{allele1}/{allele2}"

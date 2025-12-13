@@ -4,6 +4,7 @@ Analysis Routes - API endpoints for SNP analysis and visualization pages
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for
 import os
 import pandas as pd
+import numpy as np
 from . import analysis_bp
 from .samples_routes import POPULATION_INFO
 
@@ -296,46 +297,142 @@ def visualizations():
         if gender_loaded:
             gender_accuracy = predictor.sex_predictor.analyze_prediction_accuracy()
 
+        # Removed visualization generation - no longer needed without Model Performance tab
         gender_viz_data = None
-        if gender_loaded:
-            gender_viz_data = predictor.sex_predictor.generate_visualization()
-
         ancestry_viz_data = None
+        ancestry_accuracy = None
         if ancestry_loaded:
-            ancestry_viz_data = predictor.ancestry_predictor.generate_pca_visualization()
+            # Calculate ancestry accuracy if possible
+            try:
+                if predictor.ancestry_predictor.features_df is not None and 'Population' in predictor.ancestry_predictor.features_df.columns:
+                    feature_cols = [col for col in predictor.ancestry_predictor.features_df.columns if col.startswith('PC_')]
+                    if 'gender' in predictor.ancestry_predictor.features_df.columns:
+                        predictor.ancestry_predictor.features_df['SEX_numeric'] = predictor.ancestry_predictor.features_df['gender'].fillna(0).astype(int)
+                        feature_cols.append('SEX_numeric')
+                    
+                    X = predictor.ancestry_predictor.features_df[feature_cols].values
+                    predictions = predictor.ancestry_predictor.model.predict(X)
+                    predicted_pops = predictor.ancestry_predictor.encoder.inverse_transform(predictions)
+                    true_pops = predictor.ancestry_predictor.features_df['Population'].values
+                    ancestry_accuracy = float(np.mean(predicted_pops == true_pops))
+            except Exception:
+                ancestry_accuracy = None
 
+        # Organize plot files by category
         plot_files = []
         plots_dir = os.path.join(os.getcwd(), "plots")
         if os.path.exists(plots_dir):
-            plot_files = [f for f in os.listdir(plots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.svg'))]
+            plot_files = sorted([f for f in os.listdir(plots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.svg'))])
 
         viz_files = []
         viz_dir = os.path.join(os.getcwd(), "visualizations")
         if os.path.exists(viz_dir):
-            viz_files = [f for f in os.listdir(viz_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.svg'))]
+            viz_files = sorted([f for f in os.listdir(viz_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.svg'))])
+
+        # Categorize plots
+        def categorize_plot(filename):
+            filename_lower = filename.lower()
+            if 'pca' in filename_lower or 'tsne' in filename_lower or 'mds' in filename_lower:
+                return 'dimensionality'
+            elif 'confusion' in filename_lower or 'roc' in filename_lower or 'accuracy' in filename_lower or 'error' in filename_lower:
+                return 'performance'
+            elif 'population' in filename_lower or 'fst' in filename_lower or 'distance' in filename_lower or 'admixture' in filename_lower:
+                return 'population'
+            elif 'manhattan' in filename_lower or 'qq' in filename_lower or 'snp' in filename_lower or 'allele' in filename_lower or 'chromosome' in filename_lower:
+                return 'genetic_markers'
+            elif 'haplotype' in filename_lower or 'ld' in filename_lower or 'heterozygosity' in filename_lower or 'genotype' in filename_lower:
+                return 'genetic_structure'
+            elif 'learning' in filename_lower or 'effect' in filename_lower or 'feature' in filename_lower:
+                return 'model_analysis'
+            elif 'clustering' in filename_lower or 'kmeans' in filename_lower:
+                return 'clustering'
+            elif 'distribution' in filename_lower or 'sex' in filename_lower or 'gender' in filename_lower:
+                return 'distribution'
+            elif 'dashboard' in filename_lower or 'coverage' in filename_lower:
+                return 'overview'
+            else:
+                return 'other'
+
+        # Organize visualization files
+        viz_categories = {
+            'performance': [],
+            'distribution': [],
+            'clustering': [],
+            'dimensionality': [],
+            'other': []
+        }
+        
+        for viz_file in viz_files:
+            category = categorize_plot(viz_file)
+            if category in viz_categories:
+                viz_categories[category].append(viz_file)
+            else:
+                viz_categories['other'].append(viz_file)
+
+        # Organize plot files
+        plot_categories = {
+            'dimensionality': [],
+            'population': [],
+            'genetic_markers': [],
+            'genetic_structure': [],
+            'model_analysis': [],
+            'overview': [],
+            'other': []
+        }
+        
+        for plot_file in plot_files:
+            category = categorize_plot(plot_file)
+            if category in plot_categories:
+                plot_categories[category].append(plot_file)
+            else:
+                plot_categories['other'].append(plot_file)
 
         return render_template(
             "visualizations.html",
             gender_accuracy=gender_accuracy,
             gender_viz_data=gender_viz_data,
             ancestry_viz_data=ancestry_viz_data,
+            ancestry_accuracy=ancestry_accuracy,
             gender_loaded=gender_loaded,
             ancestry_loaded=ancestry_loaded,
             plot_files=plot_files,
             viz_files=viz_files,
+            plot_categories=plot_categories,
+            viz_categories=viz_categories,
         )
     except Exception as e:
         import traceback
         traceback.print_exc()
+        # Initialize empty categories for error case
+        viz_categories = {
+            'performance': [],
+            'distribution': [],
+            'clustering': [],
+            'dimensionality': [],
+            'other': []
+        }
+        plot_categories = {
+            'dimensionality': [],
+            'population': [],
+            'genetic_markers': [],
+            'genetic_structure': [],
+            'model_analysis': [],
+            'overview': [],
+            'other': []
+        }
+        
         return render_template(
             "visualizations.html",
             gender_accuracy=None,
             gender_viz_data=None,
             ancestry_viz_data=None,
+            ancestry_accuracy=None,
             gender_loaded=False,
             ancestry_loaded=False,
             plot_files=[],
             viz_files=[],
+            plot_categories=plot_categories,
+            viz_categories=viz_categories,
             error=str(e)
         )
 

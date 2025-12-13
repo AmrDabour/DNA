@@ -121,8 +121,37 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
+            
+            # Ensure upload folder exists
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            # If it's a .ped file, rename to .csv
+            if filename.lower().endswith('.ped'):
+                filename = filename[:-4] + '.csv'
+            
             file_path = os.path.join(upload_folder, filename)
-            file.save(file_path)
+            
+            # Handle existing file - add timestamp if file exists and can't be removed
+            if os.path.exists(file_path):
+                try:
+                    # Try to remove existing file first
+                    os.remove(file_path)
+                except (PermissionError, OSError):
+                    # If we can't remove it, rename the new file with timestamp
+                    name, ext = os.path.splitext(filename)
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"{name}_{timestamp}{ext}"
+                    file_path = os.path.join(upload_folder, filename)
+            
+            try:
+                file.save(file_path)
+            except PermissionError as e:
+                flash(f"Permission denied: Cannot save file. The file may be open in another program.", "error")
+                return redirect(request.url)
+            except Exception as e:
+                flash(f"Error saving file: {str(e)}", "error")
+                return redirect(request.url)
+            
             patient_id = os.path.splitext(os.path.basename(file_path))[0]
             return redirect(url_for("upload.process_snp_data", file_path=file_path, patient_id=patient_id))
 
@@ -181,7 +210,32 @@ def api_upload_sample():
             filename = filename[:-4] + '.csv'
         
         file_path = os.path.join(upload_folder, filename)
-        file.save(file_path)
+        
+        # Handle existing file - add timestamp if file exists
+        if os.path.exists(file_path):
+            try:
+                # Try to remove existing file first
+                os.remove(file_path)
+            except (PermissionError, OSError) as e:
+                # If we can't remove it, rename the new file with timestamp
+                from datetime import datetime
+                name, ext = os.path.splitext(filename)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"{name}_{timestamp}{ext}"
+                file_path = os.path.join(upload_folder, filename)
+        
+        try:
+            file.save(file_path)
+        except PermissionError as e:
+            return jsonify({
+                "success": False,
+                "error": f"Permission denied: Cannot save file. The file may be open in another program. Error: {str(e)}"
+            }), 403
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": f"Error saving file: {str(e)}"
+            }), 500
         
         return jsonify({
             "success": True,
