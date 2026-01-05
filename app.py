@@ -22,6 +22,7 @@ load_dotenv()
 from models import GeneticPredictor, POPULATION_INFO, find_model_directories
 from services import configure_gemini
 from database import db, User, init_db, create_admin_user
+from config import get_database_url, wait_for_database, get_engine_options
 
 # ============================================================
 # Flask App Setup
@@ -32,11 +33,23 @@ app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY", "genetic_prediction_app_secret_key"
 )
 
-# Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'DATABASE_URL', 'sqlite:///genovaai.db'
-)
+# Database configuration - supports both SQLite and PostgreSQL
+database_url = get_database_url()
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = get_engine_options()
+
+# Log database type being used
+if 'postgresql' in database_url:
+    print(f"🐘 Using PostgreSQL database")
+else:
+    print(f"📦 Using SQLite database")
+
+# Wait for database in production (Docker/K8s)
+if os.environ.get('FLASK_ENV') == 'production':
+    if not wait_for_database():
+        print("❌ Could not connect to database. Exiting...")
+        exit(1)
 
 # Initialize database
 init_db(app)

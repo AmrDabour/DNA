@@ -1,0 +1,10 @@
+# ============================================================
+# GenovaAI Kubernetes Namespace
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: genovaai
+  labels:
+    app: genovaai
+    environment: production

@@ -1,0 +1,72 @@
+# ============================================================
+# GenovaAI Ingress Configuration
+# Supports NGINX Ingress Controller
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: genovaai-ingress
+  namespace: genovaai
+  labels:
+    app: genovaai
+  annotations:
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    
+    # SSL redirect (uncomment when using HTTPS)
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Cert-manager for automatic TLS (uncomment when configured)
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  rules:
+    # HTTP rule (replace with your domain)
+    - host: genovaai.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: genovaai-service
+                port:
+                  number: 80
+  # TLS configuration (uncomment when using HTTPS)
+  # tls:
+  #   - hosts:
+  #       - genovaai.example.com
+  #     secretName: genovaai-tls
+---
+# ============================================================
+# GenovaAI Ingress for Local/Dev (without host-based routing)
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: genovaai-ingress-local
+  namespace: genovaai
+  labels:
+    app: genovaai
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: genovaai-service
+                port:
+                  number: 80

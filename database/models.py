@@ -1,11 +1,28 @@
 """
 Database Models - SQLAlchemy models for Users, Analysis History, and SNP Info
+Supports both SQLite (development) and PostgreSQL (production)
 """
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import json
+import os
+
+# Check if PostgreSQL is being used for JSONB support
+def is_postgres():
+    db_url = os.environ.get('DATABASE_URL', '')
+    return 'postgresql' in db_url or os.environ.get('POSTGRES_HOST')
+
+# Conditionally import PostgreSQL-specific types
+if is_postgres():
+    try:
+        from sqlalchemy.dialects.postgresql import JSONB
+        JSON_TYPE = JSONB
+    except ImportError:
+        JSON_TYPE = None
+else:
+    JSON_TYPE = None
 
 db = SQLAlchemy()
 

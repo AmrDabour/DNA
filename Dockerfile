@@ -59,22 +59,20 @@ COPY --from=builder /root/.local /root/.local
 
 # Copy application code
 COPY app.py .
+COPY alembic.ini .
 COPY models/ ./models/
 COPY routes/ ./routes/
 COPY services/ ./services/
 COPY database/ ./database/
+COPY config/ ./config/
 COPY agent/ ./agent/
 COPY utils/ ./utils/
 COPY templates/ ./templates/
 COPY static/ ./static/
 COPY new_model/ ./new_model/
-COPY hapmap_data/ ./hapmap_data/
-COPY patient_snp_data/ ./patient_snp_data/
-COPY plots/ ./plots/
-COPY visualizations/ ./visualizations/
 
 # Create necessary directories
-RUN mkdir -p uploads instance result
+RUN mkdir -p uploads instance result plots visualizations hapmap_data patient_snp_data
 
 # Create non-root user for security (optional, comment out if causing issues)
 # RUN useradd --create-home --shell /bin/bash appuser \
