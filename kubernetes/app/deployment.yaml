@@ -9,7 +9,7 @@ metadata:
   labels:
     app: genovaai
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: genovaai
@@ -204,7 +204,7 @@ metadata:
   namespace: genovaai
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 50Gi
@@ -217,7 +217,7 @@ metadata:
   namespace: genovaai
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 20Gi
