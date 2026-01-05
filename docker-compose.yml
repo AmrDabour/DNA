@@ -53,7 +53,8 @@ services:
     environment:
       # Flask Configuration
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-genetic_prediction_app_secret_key}
-      - FLASK_ENV=${FLASK_ENV:-production}
+      - FLASK_ENV=${FLASK_ENV:-development}
+      - FLASK_DEBUG=${FLASK_DEBUG:-1}
       
       # PostgreSQL Database Configuration
       - DATABASE_URL=postgresql://${POSTGRES_USER:-genovaai_user}:${POSTGRES_PASSWORD:-genovaai_secure_password_2024}@postgres:5432/${POSTGRES_DB:-genovaai}
@@ -76,6 +77,15 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@genovaai.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
     volumes:
+      # Development: Mount source code for live reload (comment out for production)
+      - ./routes:/app/routes:ro
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+      - ./services:/app/services:ro
+      - ./utils:/app/utils:ro
+      - ./config:/app/config:ro
+      - ./new_model:/app/new_model:ro
+      - ./agent:/app/agent:ro
       # Persist uploads and results
       - genovaai-uploads:/app/uploads
       - genovaai-results:/app/result

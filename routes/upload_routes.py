@@ -11,6 +11,7 @@ import time
 import re
 import subprocess
 import shutil
+import pandas as pd
 from werkzeug.utils import secure_filename
 from database.models import db, AnalysisHistory
 
@@ -24,6 +25,153 @@ ALLOWED_EXTENSIONS = {"csv", "ped"}
 def allowed_file(filename):
     """Check if a file has allowed extension"""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def convert_ped_to_csv(ped_file_path, map_file_path=None):
+    """
+    Convert PED file format to CSV format expected by the prediction models.
+    
+    PED format (PLINK):
+    - Space/tab delimited
+    - Columns: FamilyID, IndividualID, PaternalID, MaternalID, Sex(1=male,2=female), Phenotype, Genotypes...
+    - Genotypes are pairs of alleles (A1 A2 for each SNP)
+    
+    MAP format (optional, provides SNP info):
+    - Columns: Chromosome, SNP_ID, Genetic_Distance, Position
+    
+    Args:
+        ped_file_path: Path to the .ped file
+        map_file_path: Path to the .map file (optional, will look for it automatically)
+    
+    Returns:
+        Path to the converted CSV file
+    """
+    print(f"Converting PED file: {ped_file_path}")
+    
+    # Try to find associated .map file if not provided
+    if map_file_path is None:
+        base_path = ped_file_path.rsplit('.', 1)[0]
+        potential_map = base_path + '.map'
+        if os.path.exists(potential_map):
+            map_file_path = potential_map
+            print(f"Found associated MAP file: {map_file_path}")
+    
+    # Read PED file - try different delimiters
+    ped_data = None
+    for delimiter in ['\t', ' ', ',']:
+        try:
+            ped_data = pd.read_csv(ped_file_path, delimiter=delimiter, header=None, dtype=str)
+            if ped_data.shape[1] > 6:  # Valid PED should have at least 6 + genotype columns
+                break
+        except:
+            continue
+    
+    if ped_data is None or ped_data.shape[1] <= 6:
+        raise ValueError("Could not parse PED file. Please ensure it's in valid PLINK PED format.")
+    
+    print(f"PED file has {len(ped_data)} samples and {ped_data.shape[1]} columns")
+    
+    # Extract metadata from first 6 columns
+    family_id = ped_data.iloc[0, 0]
+    individual_id = ped_data.iloc[0, 1]
+    sex_code = ped_data.iloc[0, 4]  # 1=male, 2=female, 0=unknown
+    
+    # Map sex code to our format (1=male, 2=female)
+    sex_value = int(sex_code) if sex_code in ['1', '2'] else 0
+    
+    # Genotype columns start from index 6
+    genotype_cols = ped_data.iloc[:, 6:]
+    num_snps = genotype_cols.shape[1] // 2
+    print(f"Found {num_snps} SNPs in PED file")
+    
+    # Read MAP file for SNP information if available
+    snp_info = []
+    if map_file_path and os.path.exists(map_file_path):
+        try:
+            map_data = pd.read_csv(map_file_path, delimiter='\t', header=None, dtype=str)
+            if map_data.shape[1] < 4:
+                # Try space delimiter
+                map_data = pd.read_csv(map_file_path, delimiter=' ', header=None, dtype=str)
+            
+            for idx, row in map_data.iterrows():
+                snp_info.append({
+                    'CHR': row[0],
+                    'SNP': row[1],
+                    'GEN_DIST': row[2] if len(row) > 2 else '0',
+                    'POS': row[3] if len(row) > 3 else '0'
+                })
+            print(f"Loaded {len(snp_info)} SNPs from MAP file")
+        except Exception as e:
+            print(f"Warning: Could not read MAP file: {e}")
+            snp_info = []
+    
+    # Generate SNP info if MAP file not available
+    if not snp_info:
+        for i in range(num_snps):
+            snp_info.append({
+                'CHR': '0',
+                'SNP': f'SNP_{i+1}',
+                'GEN_DIST': '0',
+                'POS': str(i+1)
+            })
+    
+    # Build CSV data - one row per SNP (matching expected format)
+    csv_rows = []
+    for i in range(min(num_snps, len(snp_info))):
+        allele1_idx = 6 + (i * 2)
+        allele2_idx = 6 + (i * 2) + 1
+        
+        allele1 = ped_data.iloc[0, allele1_idx] if allele1_idx < ped_data.shape[1] else '0'
+        allele2 = ped_data.iloc[0, allele2_idx] if allele2_idx < ped_data.shape[1] else '0'
+        
+        # Handle missing data (0, N, -, .)
+        if allele1 in ['0', 'N', '-', '.', 'NA', '']:
+            allele1 = '0'
+        if allele2 in ['0', 'N', '-', '.', 'NA', '']:
+            allele2 = '0'
+        
+        csv_rows.append({
+            'CHR': snp_info[i]['CHR'],
+            'SNP': snp_info[i]['SNP'],
+            'GEN_DIST': snp_info[i]['GEN_DIST'],
+            'POS': snp_info[i]['POS'],
+            'Allele1': allele1,
+            'Allele2': allele2,
+            'Patient_ID': individual_id,
+            'Population': family_id,  # Use family ID as population if not available
+            'Sex': sex_value,
+            'gender': sex_value  # Also include as 'gender' for compatibility
+        })
+    
+    # Create DataFrame and save as CSV
+    csv_df = pd.DataFrame(csv_rows)
+    csv_file_path = ped_file_path.rsplit('.', 1)[0] + '.csv'
+    csv_df.to_csv(csv_file_path, index=False)
+    
+    print(f"Converted PED to CSV: {csv_file_path}")
+    print(f"CSV contains {len(csv_df)} SNPs for patient {individual_id}")
+    
+    return csv_file_path
+
+
+def process_uploaded_file(file_path):
+    """
+    Process an uploaded file - convert PED to CSV if needed.
+    
+    Args:
+        file_path: Path to the uploaded file
+        
+    Returns:
+        Path to the CSV file (either original or converted)
+    """
+    if file_path.lower().endswith('.ped'):
+        try:
+            return convert_ped_to_csv(file_path)
+        except Exception as e:
+            print(f"Error converting PED file: {e}")
+            # If conversion fails, try reading as-is (might be a CSV with .ped extension)
+            return file_path
+    return file_path
 
 
 def save_analysis_to_database(patient_id, file_path, result_data, processing_time, user_id=None):
@@ -125,9 +273,8 @@ def upload_file():
             # Ensure upload folder exists
             os.makedirs(upload_folder, exist_ok=True)
             
-            # If it's a .ped file, rename to .csv
-            if filename.lower().endswith('.ped'):
-                filename = filename[:-4] + '.csv'
+            # Keep original extension for proper processing
+            is_ped_file = filename.lower().endswith('.ped')
             
             file_path = os.path.join(upload_folder, filename)
             
@@ -151,6 +298,14 @@ def upload_file():
             except Exception as e:
                 flash(f"Error saving file: {str(e)}", "error")
                 return redirect(request.url)
+            
+            # Convert PED file to CSV format if needed
+            if is_ped_file:
+                try:
+                    file_path = convert_ped_to_csv(file_path)
+                    flash("PED file converted to CSV format successfully", "success")
+                except Exception as e:
+                    flash(f"Error converting PED file: {str(e)}. Trying to read as CSV format.", "warning")
             
             patient_id = os.path.splitext(os.path.basename(file_path))[0]
             return redirect(url_for("upload.process_snp_data", file_path=file_path, patient_id=patient_id))
@@ -205,9 +360,8 @@ def api_upload_sample():
         # Ensure upload folder exists
         os.makedirs(upload_folder, exist_ok=True)
         
-        # If it's a .ped file, rename to .csv
-        if filename.lower().endswith('.ped'):
-            filename = filename[:-4] + '.csv'
+        # Keep original extension for proper processing
+        is_ped_file = filename.lower().endswith('.ped')
         
         file_path = os.path.join(upload_folder, filename)
         
@@ -237,10 +391,21 @@ def api_upload_sample():
                 "error": f"Error saving file: {str(e)}"
             }), 500
         
+        # Convert PED file to CSV format if needed
+        converted_path = file_path
+        if is_ped_file:
+            try:
+                converted_path = convert_ped_to_csv(file_path)
+            except Exception as e:
+                print(f"Warning: Could not convert PED file: {e}")
+                # Keep original path, will try to read as CSV
+        
         return jsonify({
             "success": True,
-            "filename": filename,
-            "file_path": file_path
+            "filename": os.path.basename(converted_path),
+            "file_path": converted_path,
+            "original_format": "ped" if is_ped_file else "csv",
+            "converted": is_ped_file and converted_path != file_path
         })
     
     return jsonify({"success": False, "error": "Invalid file type. Only CSV and PED files are allowed."})

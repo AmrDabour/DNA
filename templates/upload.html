@@ -63,11 +63,30 @@
                 
                 <!-- Required Format Info -->
                 <div class="format-info">
-                    <h6><i class="fas fa-info-circle me-2"></i>Required Columns</h6>
-                    <div class="format-tags">
-                        <span class="tag">SNP</span>
-                        <span class="tag">Allele1</span>
-                        <span class="tag">Allele2</span>
+                    <h6><i class="fas fa-info-circle me-2"></i>Supported Formats</h6>
+                    <div class="format-section mb-3">
+                        <strong class="d-block mb-2"><i class="fas fa-file-csv me-1"></i>CSV Format (Recommended)</strong>
+                        <div class="format-tags">
+                            <span class="tag">CHR</span>
+                            <span class="tag">SNP</span>
+                            <span class="tag">POS</span>
+                            <span class="tag">Allele1</span>
+                            <span class="tag">Allele2</span>
+                            <span class="tag optional">Patient_ID</span>
+                            <span class="tag optional">Population</span>
+                            <span class="tag optional">Sex</span>
+                        </div>
+                    </div>
+                    <div class="format-section">
+                        <strong class="d-block mb-2"><i class="fas fa-file-alt me-1"></i>PED Format (PLINK)</strong>
+                        <p class="text-muted small mb-2">Standard PLINK PED format - will be automatically converted</p>
+                        <div class="format-tags">
+                            <span class="tag">FamilyID</span>
+                            <span class="tag">IndividualID</span>
+                            <span class="tag">Sex</span>
+                            <span class="tag">Genotypes...</span>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0"><i class="fas fa-lightbulb me-1"></i>Tip: Upload the .map file with the same name for SNP annotations</p>
                     </div>
                 </div>
             </div>
@@ -282,18 +301,25 @@
         margin-top: 2rem;
         padding-top: 1.5rem;
         border-top: 1px solid var(--glass-border);
-        text-align: center;
+        text-align: left;
     }
     
     .format-info h6 {
-        color: var(--text-muted);
-        font-weight: 500;
-        margin-bottom: 0.75rem;
+        color: var(--text-primary);
+        font-weight: 600;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .format-section {
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius);
     }
     
     .format-tags {
         display: flex;
-        justify-content: center;
+        flex-wrap: wrap;
         gap: 0.5rem;
     }
     
@@ -304,6 +330,17 @@
         font-size: 0.8rem;
         font-weight: 500;
         color: var(--primary);
+    }
+    
+    .tag.optional {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+    
+    .tag.optional::after {
+        content: " (optional)";
+        font-size: 0.7rem;
+        opacity: 0.7;
     }
     
     @keyframes fadeIn {
@@ -362,13 +399,34 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle file
     function handleFile(file) {
-        if (!file.name.endsWith('.csv') && !file.name.endsWith('.ped')) {
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        if (fileExt !== 'csv' && fileExt !== 'ped') {
             alert('Please upload a CSV or PED file');
             return;
         }
         
         fileName.textContent = file.name;
         fileSize.textContent = formatFileSize(file.size);
+        
+        // Update icon based on file type
+        const fileIcon = filePreview.querySelector('.file-icon i');
+        if (fileExt === 'ped') {
+            fileIcon.className = 'fas fa-file-alt';
+            // Add a note about conversion
+            let conversionNote = filePreview.querySelector('.conversion-note');
+            if (!conversionNote) {
+                conversionNote = document.createElement('small');
+                conversionNote.className = 'conversion-note text-muted d-block mt-2';
+                conversionNote.innerHTML = '<i class="fas fa-info-circle me-1"></i>PED file will be automatically converted to CSV format';
+                filePreview.querySelector('.file-info').appendChild(conversionNote);
+            }
+        } else {
+            fileIcon.className = 'fas fa-file-csv';
+            // Remove conversion note if exists
+            const conversionNote = filePreview.querySelector('.conversion-note');
+            if (conversionNote) conversionNote.remove();
+        }
+        
         dropZone.style.display = 'none';
         filePreview.style.display = 'block';
         submitBtn.disabled = false;
