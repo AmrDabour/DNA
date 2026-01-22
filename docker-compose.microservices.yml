@@ -1,0 +1,245 @@
+# =============================================================================
+# GenovaAI Microservices - Docker Compose Configuration
+# =============================================================================
+# 
+# Services:
+#   - postgres      : PostgreSQL Database (port 5432)
+#   - auth-service  : Authentication & Users (port 5001)
+#   - analysis-service : SNP Analysis & History (port 5002)
+#   - prediction-service : ML Predictions (port 5003)
+#   - ai-service    : Gemini AI Integration (port 5004)
+#   - agent-service : LangGraph DNA Agent (port 5005)
+#   - frontend      : Web UI & API Gateway (port 8080)
+#
+# Usage:
+#   docker-compose -f docker-compose.microservices.yml up -d
+#   docker-compose -f docker-compose.microservices.yml down
+#   docker-compose -f docker-compose.microservices.yml logs -f [service]
+#
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Database
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: genovaai-postgres
+    environment:
+      POSTGRES_USER: genovaai_user
+      POSTGRES_PASSWORD: genovaai_secure_password_2024
+      POSTGRES_DB: genovaai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init_scripts:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U genovaai_user -d genovaai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - genovaai-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Auth Service - User Authentication
+  # ===========================================================================
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: genovaai-auth
+    environment:
+      - FLASK_ENV=production
+      - AUTH_SERVICE_PORT=5001
+      - DATABASE_URL=postgresql://genovaai_user:genovaai_secure_password_2024@postgres:5432/genovaai
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-super_secret_key_change_in_production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt_secret_key_change_in_production}
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - genovaai-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Analysis Service - SNP Analysis & History
+  # ===========================================================================
+  analysis-service:
+    build:
+      context: ./services/analysis-service
+      dockerfile: Dockerfile
+    container_name: genovaai-analysis
+    environment:
+      - FLASK_ENV=production
+      - ANALYSIS_SERVICE_PORT=5002
+      - DATABASE_URL=postgresql://genovaai_user:genovaai_secure_password_2024@postgres:5432/genovaai
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-super_secret_key_change_in_production}
+      - UPLOADS_PATH=/app/uploads
+    ports:
+      - "5002:5002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - genovaai-network
+    restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
+
+  # ===========================================================================
+  # Prediction Service - ML Models
+  # ===========================================================================
+  prediction-service:
+    build:
+      context: ./services/prediction-service
+      dockerfile: Dockerfile
+    container_name: genovaai-prediction
+    environment:
+      - FLASK_ENV=production
+      - PREDICTION_SERVICE_PORT=5003
+      - MODEL_PATH=/app/models
+    ports:
+      - "5003:5003"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - genovaai-network
+    restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
+
+  # ===========================================================================
+  # AI Service - Gemini Integration
+  # ===========================================================================
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: genovaai-ai
+    environment:
+      - FLASK_ENV=production
+      - AI_SERVICE_PORT=5004
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_AI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+    ports:
+      - "5004:5004"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - genovaai-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Agent Service - LangGraph DNA Agent
+  # ===========================================================================
+  agent-service:
+    build:
+      context: ./services/agent-service
+      dockerfile: Dockerfile
+    container_name: genovaai-agent
+    environment:
+      - FLASK_ENV=production
+      - AGENT_SERVICE_PORT=5005
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_AI_API_KEY=${GEMINI_API_KEY}
+      - AGENT_MODEL=${AGENT_MODEL:-gemini-2.5-flash}
+      - PREDICTION_SERVICE_URL=http://prediction-service:5003
+      - ANALYSIS_SERVICE_URL=http://analysis-service:5002
+      - AI_SERVICE_URL=http://ai-service:5004
+    ports:
+      - "5005:5005"
+    depends_on:
+      - prediction-service
+      - analysis-service
+      - ai-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - genovaai-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Frontend Service - Web UI & API Gateway
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./services/frontend-service
+      dockerfile: Dockerfile
+    container_name: genovaai-frontend
+    environment:
+      - FLASK_ENV=production
+      - FRONTEND_PORT=8080
+      - DATABASE_URL=postgresql://genovaai_user:genovaai_secure_password_2024@postgres:5432/genovaai
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-super_secret_key_change_in_production}
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - ANALYSIS_SERVICE_URL=http://analysis-service:5002
+      - PREDICTION_SERVICE_URL=http://prediction-service:5003
+      - AI_SERVICE_URL=http://ai-service:5004
+      - AGENT_SERVICE_URL=http://agent-service:5005
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - analysis-service
+      - prediction-service
+      - ai-service
+      - agent-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - genovaai-network
+    restart: unless-stopped
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  genovaai-network:
+    driver: bridge
+    name: genovaai-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    name: genovaai-postgres-data
+  uploads_data:
+    name: genovaai-uploads

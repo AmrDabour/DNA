@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Advanced DNA Genetic Prediction System - AI-powered ancestry and trait analysis">
+    <meta name="theme-color" content="#6366f1">
+    <title>{% block title %}Genetic Prediction System{% endblock %}</title>
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Google Fonts - Inter for modern UI -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome 6 - All styles including brands -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- AOS - Animate On Scroll -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Global modal cleanup styles -->
+    <style>
+        /* Ensure body is scrollable when no modal is open */
+        body:not(.modal-open) {
+            overflow: auto !important;
+            padding-right: 0 !important;
+        }
+        
+        /* Force remove modal backdrop when modal is not open */
+        body:not(.modal-open) .modal-backdrop {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        
+        /* Remove any lingering backdrops */
+        .modal-backdrop.fade.show:not(.modal-open) {
+            display: none !important;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <div class="animated-bg"></div>
+    
+    <!-- DNA Particles -->
+    <div id="particles-container"></div>
+
+    <!-- Modern Navigation -->
+    <nav class="navbar navbar-expand-lg fixed-top" id="mainNav">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-dna"></i>
+                <span>Genova AI</span>
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarCollapse">
+                <ul class="navbar-nav mx-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+                            <i class="fas fa-home"></i>
+                            <span>Home</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/dashboard' %}active{% endif %}" href="/dashboard">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/ancestry-map' %}active{% endif %}" href="/ancestry-map">
+                            <i class="fas fa-map-marked-alt"></i>
+                            <span>Ancestry Map</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/upload' %}active{% endif %}" href="/upload">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>Upload</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/snp_query' %}active{% endif %}" href="/snp_query">
+                            <i class="fas fa-search-plus"></i>
+                            <span>SNP Query</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/snp-database' %}active{% endif %}" href="/snp-database">
+                            <i class="fas fa-database"></i>
+                            <span>SNP Database</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/risk-calculator' %}active{% endif %}" href="/risk-calculator">
+                            <i class="fas fa-calculator"></i>
+                            <span>Risk Calculator</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/chat' %}active{% endif %}" href="/chat">
+                            <i class="fas fa-robot"></i>
+                            <span>AI Assistant</span>
+                            <span class="pulse-dot ms-1"></span>
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center gap-2">
+                    <!-- Notification Bell -->
+                    <div class="dropdown" id="notifications-dropdown">
+                        <button class="btn btn-sm position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+                            <i class="fas fa-bell"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge" id="notification-count" style="display: none;">
+                                0
+                            </span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end notification-menu" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-bell me-2"></i>Notifications</h6>
+                                <button class="btn btn-sm btn-link text-muted p-0" onclick="markAllAsRead()">Mark all read</button>
+                            </div>
+                            <div id="notification-list">
+                                <div class="text-center py-4 text-muted">
+                                    <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                    <p class="mb-0 small">No new notifications</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Theme Toggle -->
+                    <button class="btn btn-sm" id="theme-toggle" title="Toggle theme">
+                        <i class="fas fa-moon" id="dark-icon"></i>
+                        <i class="fas fa-sun" id="light-icon" style="display: none;"></i>
+                    </button>
+                    
+                    <!-- User Menu / Auth -->
+                    {% if current_user.is_authenticated %}
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>{{ current_user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile"><i class="fas fa-user me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="/history"><i class="fas fa-history me-2"></i>My History</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                    {% else %}
+                    <a href="/login" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-sign-in-alt me-1"></i>Login
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <main class="col-12 px-md-4 py-3">
+                <!-- Flash messages -->
+                <div class="flash-messages">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else category }} alert-dismissible fade show fade-in-up" role="alert">
+                        <div class="d-flex align-items-center">
+                            <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'error' or category == 'danger' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %} me-2"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+                </div>
+
+                <!-- Page content -->
+                <div class="page-content fade-in">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-glow"></div>
+        <div class="footer-particles" id="footer-particles"></div>
+        
+        <div class="container">
+            <!-- Main Footer Content -->
+            <div class="row g-4 pb-5">
+                <!-- Brand Column -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="footer-brand">
+                        <a href="/" class="footer-logo">
+                            <div class="logo-helix">
+                                <i class="fas fa-dna"></i>
+                            </div>
+                            <span>Genova AI</span>
+                        </a>
+                        <p class="footer-tagline">
+                            Unlocking the secrets of your DNA with advanced AI-powered genetic analysis. 
+                            Discover your ancestry, traits, and health insights.
+                        </p>
+                        <div class="footer-social">
+                            <!-- LinkedIn Team Popup -->
+                            <div class="linkedin-team-wrapper">
+                                <a href="#" class="social-link linkedin-trigger" title="Our Team on LinkedIn" onclick="event.preventDefault()">
+                                    <i class="fa-brands fa-linkedin-in"></i>
+                                    <span class="team-badge">5</span>
+                                    <!-- Particle burst effects -->
+                                    <span class="particle"></span>
+                                    <span class="particle"></span>
+                                    <span class="particle"></span>
+                                    <span class="particle"></span>
+                                    <span class="particle"></span>
+                                    <span class="particle"></span>
+                                    <span class="particle"></span>
+                                    <span class="particle"></span>
+                                </a>
+                                <div class="linkedin-team-popup">
+                                    <div class="popup-header">
+                                        <i class="fa-brands fa-linkedin"></i>
+                                        <span>Meet Our Team</span>
+                                    </div>
+                                    <div class="popup-members">
+                                        <a href="https://www.linkedin.com/in/amrdabour/" target="_blank" rel="noopener noreferrer" class="team-member">
+                                            <div class="member-avatar">AD</div>
+                                            <div class="member-info">
+                                                <span class="member-name">Amr Dabour</span>
+                                                <span class="member-connect">Connect <i class="fas fa-external-link-alt"></i></span>
+                                            </div>
+                                        </a>
+                                        <a href="https://www.linkedin.com/in/abdallasheta" target="_blank" rel="noopener noreferrer" class="team-member">
+                                            <div class="member-avatar">AS</div>
+                                            <div class="member-info">
+                                                <span class="member-name">Abdalla Sheta</span>
+                                                <span class="member-connect">Connect <i class="fas fa-external-link-alt"></i></span>
+                                            </div>
+                                        </a>
+                                        <a href="https://www.linkedin.com/in/yousef-mohamed-505b92278/" target="_blank" rel="noopener noreferrer" class="team-member">
+                                            <div class="member-avatar">YM</div>
+                                            <div class="member-info">
+                                                <span class="member-name">Yousef Mohamed</span>
+                                                <span class="member-connect">Connect <i class="fas fa-external-link-alt"></i></span>
+                                            </div>
+                                        </a>
+                                        <a href="https://www.linkedin.com/in/ahmed-mohammed-478a15357" target="_blank" rel="noopener noreferrer" class="team-member">
+                                            <div class="member-avatar">AM</div>
+                                            <div class="member-info">
+                                                <span class="member-name">Ahmed Mohammed</span>
+                                                <span class="member-connect">Connect <i class="fas fa-external-link-alt"></i></span>
+                                            </div>
+                                        </a>
+                                        <a href="https://www.linkedin.com/in/ahmedmagdyt122" target="_blank" rel="noopener noreferrer" class="team-member">
+                                            <div class="member-avatar">AM</div>
+                                            <div class="member-info">
+                                                <span class="member-name">Ahmed Magdy</span>
+                                                <span class="member-connect">Connect <i class="fas fa-external-link-alt"></i></span>
+                                            </div>
+                                        </a>
+                                    </div>
+                                    <div class="popup-footer">
+                                        <span><i class="fas fa-users"></i> Built with passion by our team</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="https://github.com/AmrDabour" class="social-link" title="GitHub" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-brands fa-github"></i>
+                            </a>
+                            <a href="https://www.facebook.com/amr.dabour.3/" class="social-link" title="Facebook" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-brands fa-facebook-f"></i>
+                            </a>
+                            <a href="https://discord.gg/rWrzgzYe" class="social-link" title="Discord" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-brands fa-discord"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Links -->
+                <div class="col-lg-2 col-md-6 col-6">
+                    <div class="footer-widget">
+                        <h5 class="widget-title">
+                            <span class="title-icon"><i class="fas fa-link"></i></span>
+                            Quick Links
+                        </h5>
+                        <ul class="footer-links">
+                            <li><a href="/"><i class="fas fa-chevron-right"></i> Home</a></li>
+                            <li><a href="/dashboard"><i class="fas fa-chevron-right"></i> Dashboard</a></li>
+                            <li><a href="/upload"><i class="fas fa-chevron-right"></i> Upload DNA</a></li>
+                            <li><a href="/ancestry-map"><i class="fas fa-chevron-right"></i> Ancestry Map</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Analysis Tools -->
+                <div class="col-lg-2 col-md-6 col-6">
+                    <div class="footer-widget">
+                        <h5 class="widget-title">
+                            <span class="title-icon"><i class="fas fa-flask"></i></span>
+                            Analysis
+                        </h5>
+                        <ul class="footer-links">
+                            <li><a href="/snp_query"><i class="fas fa-chevron-right"></i> SNP Query</a></li>
+                            <li><a href="/snp-database"><i class="fas fa-chevron-right"></i> SNP Database</a></li>
+                            <li><a href="/risk-calculator"><i class="fas fa-chevron-right"></i> Risk Calculator</a></li>
+                            <li><a href="/chat"><i class="fas fa-chevron-right"></i> AI Assistant</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Newsletter / Contact -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="footer-widget">
+                        <h5 class="widget-title">
+                            <span class="title-icon"><i class="fas fa-envelope"></i></span>
+                            Stay Updated
+                        </h5>
+                        <p class="widget-text">Subscribe to receive updates on new features and genetic research insights.</p>
+                        <form class="newsletter-form" onsubmit="event.preventDefault(); subscribeNewsletter();">
+                            <div class="input-wrapper">
+                                <input type="email" placeholder="Enter your email" required>
+                                <button type="submit">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </form>
+                        <div class="footer-badges">
+                            <span class="badge-item">
+                                <i class="fas fa-shield-alt"></i> Secure
+                            </span>
+                            <span class="badge-item">
+                                <i class="fas fa-lock"></i> Private
+                            </span>
+                            <span class="badge-item">
+                                <i class="fas fa-certificate"></i> Trusted
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- DNA Separator -->
+            <div class="dna-separator">
+                <div class="dna-strand">
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+            
+            <!-- Bottom Footer -->
+            <div class="footer-bottom">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <p class="copyright">
+                            &copy; <span id="current-year">2024</span> <strong>Genova AI</strong>. 
+                            All rights reserved. Built with <i class="fas fa-heart pulse-heart"></i> for science.
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="footer-bottom-links">
+                            <a href="/privacy-policy">Privacy Policy</a>
+                            <a href="/terms-of-use">Terms of Use</a>
+                            <a href="/contact">Contact</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scroll to Top Button -->
+    <button class="fab" id="scrollToTop" style="display: none;" title="Scroll to top">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- AOS - Animate On Scroll -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    
+    <!-- CountUp.js for animated numbers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/countup.js/2.6.0/countUp.umd.min.js"></script>
+    
+    <script>
+        // Initialize AOS
+        AOS.init({
+            duration: 800,
+            easing: 'ease-out-cubic',
+            once: true,
+            offset: 50
+        });
+
+        // Clean up any stuck modal backdrops on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove all modal backdrops immediately
+            document.querySelectorAll('.modal-backdrop').forEach(el => {
+                el.remove();
+            });
+            // Remove modal-open class and reset body styles
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+            // Force remove any lingering backdrops
+            setTimeout(function() {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            }, 100);
+        });
+
+        // Dark mode toggle
+        document.addEventListener('DOMContentLoaded', function () {
+            const themeToggle = document.getElementById('theme-toggle');
+            const darkIcon = document.getElementById('dark-icon');
+            const lightIcon = document.getElementById('light-icon');
+            const htmlElement = document.documentElement;
+
+            // Check for saved theme preference or prefer-color-scheme
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+            
+            htmlElement.setAttribute('data-bs-theme', initialTheme);
+            updateIcons(initialTheme);
+
+            // Theme toggle click handler
+            themeToggle.addEventListener('click', function () {
+                const currentTheme = htmlElement.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                htmlElement.setAttribute('data-bs-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                updateIcons(newTheme);
+                
+                // Add rotation animation
+                this.style.transform = 'rotate(360deg)';
+                setTimeout(() => this.style.transform = '', 300);
+            });
+
+            function updateIcons(theme) {
+                if (theme === 'dark') {
+                    darkIcon.style.display = 'none';
+                    lightIcon.style.display = 'inline-block';
+                } else {
+                    darkIcon.style.display = 'inline-block';
+                    lightIcon.style.display = 'none';
+                }
+            }
+            
+            // Navbar scroll effect
+            const navbar = document.getElementById('mainNav');
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 50) {
+                    navbar.classList.add('scrolled');
+                } else {
+                    navbar.classList.remove('scrolled');
+                }
+            });
+            
+            // Scroll to top button
+            const scrollToTopBtn = document.getElementById('scrollToTop');
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 300) {
+                    scrollToTopBtn.style.display = 'flex';
+                    scrollToTopBtn.classList.add('fade-in');
+                } else {
+                    scrollToTopBtn.style.display = 'none';
+                }
+            });
+            
+            scrollToTopBtn.addEventListener('click', function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            
+            // Add ripple effect to buttons
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.classList.add('ripple');
+            });
+            
+            // Initialize tooltips
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
+            
+            // Counter animation for stat numbers
+            const observerOptions = {
+                threshold: 0.5
+            };
+            
+            const counterObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const el = entry.target;
+                        const originalText = el.textContent;
+                        const target = parseInt(el.getAttribute('data-count') || el.textContent);
+                        if (!isNaN(target) && typeof countUp !== 'undefined') {
+                            // Detect suffix from original text (% or /7 or K+ or M+)
+                            let suffix = '';
+                            if (originalText.includes('%')) {
+                                suffix = '%';
+                            } else if (originalText.includes('/7')) {
+                                suffix = '/7';
+                            } else if (originalText.includes('M+')) {
+                                suffix = 'M+';
+                            } else if (originalText.includes('K+')) {
+                                suffix = 'K+';
+                            }
+                            
+                            const counter = new countUp.CountUp(el, target, {
+                                duration: 2,
+                                enableScrollSpy: false,
+                                suffix: suffix
+                            });
+                            counter.start();
+                        }
+                        counterObserver.unobserve(el);
+                    }
+                });
+            }, observerOptions);
+            
+            document.querySelectorAll('.stat-number, .counter').forEach(el => {
+                counterObserver.observe(el);
+            });
+            
+            // Create floating DNA particles
+            createParticles();
+            
+            // Create footer particles
+            createFooterParticles();
+        });
+        
+        // Newsletter subscription
+        function subscribeNewsletter() {
+            const form = document.querySelector('.newsletter-form');
+            const input = form.querySelector('input');
+            const email = input.value;
+            
+            // Show success feedback
+            input.value = '';
+            input.placeholder = 'Thanks for subscribing!';
+            
+            // Reset after 3 seconds
+            setTimeout(() => {
+                input.placeholder = 'Enter your email';
+            }, 3000);
+        }
+        
+        // Set current year in footer
+        const yearEl = document.getElementById('current-year');
+        if (yearEl) yearEl.textContent = new Date().getFullYear();
+        
+        // Create footer particles
+        function createFooterParticles() {
+            const container = document.getElementById('footer-particles');
+            if (!container) return;
+            
+            const colors = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981'];
+            
+            for (let i = 0; i < 15; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'footer-particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 5 + 's';
+                particle.style.animationDuration = (3 + Math.random() * 4) + 's';
+                particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+                particle.style.width = (3 + Math.random() * 4) + 'px';
+                particle.style.height = particle.style.width;
+                container.appendChild(particle);
+            }
+        }
+        
+        // Create floating particles effect
+        function createParticles() {
+            const container = document.getElementById('particles-container');
+            if (!container) return;
+            
+            const colors = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981'];
+            
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'dna-particle';
+                particle.style.left = Math.random() * 100 + 'vw';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+                particle.style.width = (4 + Math.random() * 4) + 'px';
+                particle.style.height = particle.style.width;
+                container.appendChild(particle);
+            }
+        }
+        
+        // Confetti effect for success actions
+        function triggerConfetti() {
+            const colors = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 3 + 's';
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 3000);
+            }
+        }
+        
+        // ============================================================
+        // Notification System
+        // ============================================================
+        
+        // Load notifications on page load
+        function loadNotifications() {
+            fetch('/api/notifications')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        updateNotificationUI(data.notifications);
+                    }
+                })
+                .catch(err => console.log('Notifications not available'));
+        }
+        
+        function updateNotificationUI(notifications) {
+            const countBadge = document.getElementById('notification-count');
+            const listContainer = document.getElementById('notification-list');
+            
+            const unreadCount = notifications.filter(n => !n.read).length;
+            
+            if (unreadCount > 0) {
+                countBadge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+                countBadge.style.display = 'block';
+            } else {
+                countBadge.style.display = 'none';
+            }
+            
+            if (notifications.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <p class="mb-0 small">No new notifications</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            listContainer.innerHTML = notifications.slice(0, 10).map(n => `
+                <div class="dropdown-item notification-item ${n.read ? '' : 'unread'}" onclick="markAsRead('${n.id}')">
+                    <div class="d-flex align-items-start">
+                        <div class="notification-icon ${n.type}">
+                            <i class="fas fa-${getNotificationIcon(n.type)}"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-2">
+                            <strong class="d-block">${n.title}</strong>
+                            <small class="text-muted">${n.message}</small>
+                            <div class="small text-muted mt-1">${formatTime(n.created_at)}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function getNotificationIcon(type) {
+            const icons = {
+                'success': 'check-circle',
+                'error': 'exclamation-circle',
+                'info': 'info-circle',
+                'warning': 'exclamation-triangle',
+                'analysis': 'chart-line'
+            };
+            return icons[type] || 'bell';
+        }
+        
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 7) return `${diffDays}d ago`;
+            return date.toLocaleDateString();
+        }
+        
+        function markAsRead(notificationId) {
+            fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' })
+                .then(() => loadNotifications());
+        }
+        
+        function markAllAsRead() {
+            fetch('/api/notifications/mark-all-read', { method: 'POST' })
+                .then(() => loadNotifications());
+        }
+        
+        // Load notifications when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadNotifications();
+            // Poll for new notifications every 30 seconds
+            setInterval(loadNotifications, 30000);
+        });
+    </script>
+    
+    <style>
+        /* Notification styles */
+        .notification-menu {
+            background: var(--bg-primary);
+            border: 1px solid var(--glass-border);
+        }
+        
+        .notification-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .notification-item:hover {
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .notification-item.unread {
+            background: rgba(99, 102, 241, 0.05);
+            border-left: 3px solid var(--primary);
+        }
+        
+        .notification-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+        
+        .notification-icon.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .notification-icon.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .notification-icon.info { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .notification-icon.warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .notification-icon.analysis { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+        
+        .notification-badge {
+            font-size: 0.65rem;
+            padding: 0.2rem 0.4rem;
+        }
+    </style>
+    
+    <script>
+        // Aggressive modal backdrop cleanup - runs immediately
+        (function() {
+            function removeAllBackdrops() {
+                // Remove all modal backdrops
+                document.querySelectorAll('.modal-backdrop').forEach(function(el) {
+                    el.remove();
+                });
+                // Remove custom backdrops
+                document.querySelectorAll('.custom-backdrop').forEach(function(el) {
+                    el.classList.remove('show');
+                    el.remove();
+                });
+                // Reset body state
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                
+                // Hide any modals that might be stuck open
+                document.querySelectorAll('.modal.show').forEach(function(modal) {
+                    modal.classList.remove('show');
+                    modal.style.display = 'none';
+                    modal.setAttribute('aria-hidden', 'true');
+                });
+            }
+            
+            // Run immediately
+            removeAllBackdrops();
+            
+            // Run on DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', removeAllBackdrops);
+            } else {
+                removeAllBackdrops();
+            }
+            
+            // Global modal cleanup function available to all pages
+            window.cleanupAllModals = removeAllBackdrops;
+        })();
+        
+        // MutationObserver to catch dynamically added backdrops
+        const backdropObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        // Check if the added node is a backdrop
+                        if (node.classList && node.classList.contains('modal-backdrop')) {
+                            // If body doesn't have modal-open, remove it immediately
+                            if (!document.body.classList.contains('modal-open')) {
+                                node.remove();
+                            }
+                        }
+                        // Check if backdrop was added inside the node
+                        const backdrops = node.querySelectorAll && node.querySelectorAll('.modal-backdrop');
+                        if (backdrops && backdrops.length > 0 && !document.body.classList.contains('modal-open')) {
+                            backdrops.forEach(function(backdrop) {
+                                backdrop.remove();
+                            });
+                        }
+                    }
+                });
+            });
+        });
+        
+        // Start observing the document body for added nodes
+        backdropObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        
+        // Periodically check for stuck backdrops (safety net - runs every 500ms)
+        setInterval(function() {
+            // If there's a backdrop but no visible modal, clean up
+            const hasBackdrop = document.querySelector('.modal-backdrop');
+            const hasVisibleModal = document.querySelector('.modal.show');
+            if (hasBackdrop && !hasVisibleModal) {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            }
+            // Also check if body doesn't have modal-open but backdrop exists
+            if (!document.body.classList.contains('modal-open')) {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            }
+        }, 500);
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

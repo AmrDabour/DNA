@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Genova AI - Advanced DNA Genetic Prediction System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Hero Section -->
+    <section class="hero-section mb-5" data-aos="fade-up">
+        <div class="row align-items-center">
+            <div class="col-lg-7">
+                <div class="hero-badge">
+                    <i class="fas fa-bolt"></i>
+                    <span>AI-Powered Genetic Analysis</span>
+                </div>
+                <h1 class="display-4 fw-bold text-white mb-3">
+                    Unlock the Secrets of Your <span class="text-gradient-light">DNA</span>
+                </h1>
+                <p class="lead text-white-50 mb-4">
+                    Advanced machine learning algorithms analyze genetic markers to predict ancestry, 
+                    biological traits, and provide insights into your unique genetic makeup.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="/upload" class="btn btn-light btn-lg px-4">
+                        <i class="fas fa-rocket me-2"></i>Get Started
+                    </a>
+                    <a href="/dashboard" class="btn btn-outline-light btn-lg px-4">
+                        <i class="fas fa-play me-2"></i>View Dashboard
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-5 d-none d-lg-block">
+                <div class="hero-visual">
+                    <div class="dna-helix-animation">
+                        <i class="fas fa-dna fa-8x text-white opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="row mb-5" data-aos="fade-up" data-aos-delay="100">
+        <div class="col-6 col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-number counter" data-count="11">11</div>
+                <div class="stat-label">Populations</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-number counter" data-count="1">1M+</div>
+                <div class="stat-label">SNP Markers</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-number counter" data-count="97">97%</div>
+                <div class="stat-label">Accuracy</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-number counter" data-count="24">24/7</div>
+                <div class="stat-label">AI Support</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- System Status -->
+    <section class="row mb-5">
+        <div class="col-md-6 mb-4" data-aos="fade-right" data-aos-delay="200">
+            <div class="glass-card h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon me-3" style="width: 50px; height: 50px; margin: 0;">
+                            <i class="fas fa-venus-mars"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Gender Prediction Model</h5>
+                            {% if gender_loaded %}
+                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Online</span>
+                            {% else %}
+                            <span class="badge bg-warning"><i class="fas fa-exclamation me-1"></i>Offline</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if gender_loaded %}
+                    <p class="text-muted mb-2">Model loaded successfully and ready for predictions.</p>
+                    <div class="d-flex align-items-center">
+                        <span class="pulse-dot me-2"></span>
+                        <small class="text-muted">{{ gender_model_dir }}</small>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">The Gender Prediction model needs to be loaded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4" data-aos="fade-left" data-aos-delay="200">
+            <div class="glass-card h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="feature-icon me-3" style="width: 50px; height: 50px; margin: 0;">
+                            <i class="fas fa-globe-americas"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Ancestry Prediction Model</h5>
+                            {% if ancestry_loaded %}
+                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Online</span>
+                            {% else %}
+                            <span class="badge bg-warning"><i class="fas fa-exclamation me-1"></i>Offline</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if ancestry_loaded %}
+                    <p class="text-muted mb-2">Model loaded successfully and ready for predictions.</p>
+                    <div class="d-flex align-items-center">
+                        <span class="pulse-dot me-2"></span>
+                        <small class="text-muted">{{ ancestry_model_dir }}</small>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">The ancestry prediction model needs to be loaded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {% if not gender_loaded or not ancestry_loaded %}
+    <!-- Model Upload Section -->
+    <section class="mb-5" data-aos="fade-up">
+        <div class="card border-gradient">
+            <div class="card-header bg-transparent border-0 pt-4 px-4">
+                <h4 class="mb-0 text-gradient"><i class="fas fa-cog me-2"></i>Configure Models</h4>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <form action="/upload_model_directories" method="post">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label for="gender_model_dir" class="form-label">
+                                <i class="fas fa-venus-mars me-1"></i>Gender Prediction Model Directory
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-folder"></i></span>
+                                <input type="text" class="form-control" id="gender_model_dir" name="gender_model_dir"
+                                    placeholder="./hapmap_data/gender_prediction_data" {% if gender_loaded %}value="{{ gender_model_dir }}" readonly{% endif %}>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="ancestry_model_dir" class="form-label">
+                                <i class="fas fa-globe me-1"></i>Ancestry Prediction Model Directory
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-folder"></i></span>
+                                <input type="text" class="form-control" id="ancestry_model_dir" name="ancestry_model_dir"
+                                    placeholder="./hapmap_data/Model_region" {% if ancestry_loaded %}value="{{ ancestry_model_dir }}" readonly{% endif %}>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary btn-glow">
+                                <i class="fas fa-download me-2"></i>Load Models
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Features Section -->
+    <section class="mb-5">
+        <div class="text-center mb-5" data-aos="fade-up">
+            <h2 class="fw-bold mb-3">Powerful <span class="text-gradient">Features</span></h2>
+            <p class="text-muted mx-auto" style="max-width: 600px;">
+                Explore our comprehensive suite of genetic analysis tools powered by cutting-edge machine learning.
+            </p>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="100">
+                <div class="feature-card h-100">
+                    <div class="feature-icon">
+                        <i class="fas fa-vial"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3">SNP Database</h5>
+                    <p class="text-muted mb-4">Browse and explore our comprehensive SNP database with detailed genetic variant information and associations.</p>
+                    <a href="/snp-database" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-right me-2"></i>Explore Database
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
+                <div class="feature-card h-100">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3">Visual Analytics</h5>
+                    <p class="text-muted mb-4">Interactive visualizations and detailed accuracy statistics for prediction analysis.</p>
+                    <a href="/visualizations" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-right me-2"></i>View Analytics
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
+                <div class="feature-card h-100">
+                    <div class="feature-icon">
+                        <i class="fas fa-globe-americas"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3">Ancestry Map</h5>
+                    <p class="text-muted mb-4">Explore genetic ancestral populations and their geographic distribution with interactive visualizations.</p>
+                    <a href="/ancestry-map" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-right me-2"></i>View Ancestry Map
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="400">
+                <div class="feature-card h-100">
+                    <div class="feature-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3">Upload & Analyze</h5>
+                    <p class="text-muted mb-4">Upload your own SNP data files and get instant predictions with our AI models.</p>
+                    <a href="/upload" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-right me-2"></i>Upload Data
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="500">
+                <div class="feature-card h-100">
+                    <div class="feature-icon">
+                        <i class="fas fa-search-plus"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3">SNP Query</h5>
+                    <p class="text-muted mb-4">Search and explore specific SNP markers in our database with detailed information.</p>
+                    <a href="/snp_query" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-right me-2"></i>Query SNPs
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="600">
+                <div class="feature-card h-100">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3">AI Assistant</h5>
+                    <p class="text-muted mb-4">Chat with our AI assistant for help with genetic analysis and interpretation.</p>
+                    <a href="/chat" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-right me-2"></i>Start Chat
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="mb-5" data-aos="fade-up">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>How It Works</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-3 text-center">
+                        <div class="position-relative">
+                            <div class="rounded-circle bg-gradient-primary d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <span class="text-white fw-bold fs-5">1</span>
+                            </div>
+                            <h6 class="fw-bold">Upload Data</h6>
+                            <p class="text-muted small">Submit your SNP data in CSV format</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="position-relative">
+                            <div class="rounded-circle bg-gradient-primary d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <span class="text-white fw-bold fs-5">2</span>
+                            </div>
+                            <h6 class="fw-bold">AI Analysis</h6>
+                            <p class="text-muted small">Our ML models process your genetic markers</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="position-relative">
+                            <div class="rounded-circle bg-gradient-primary d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <span class="text-white fw-bold fs-5">3</span>
+                            </div>
+                            <h6 class="fw-bold">Get Results</h6>
+                            <p class="text-muted small">Receive detailed predictions and insights</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="position-relative">
+                            <div class="rounded-circle bg-gradient-primary d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <span class="text-white fw-bold fs-5">4</span>
+                            </div>
+                            <h6 class="fw-bold">Explore More</h6>
+                            <p class="text-muted small">Visualize and analyze your genetic data</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        min-height: 400px;
+    }
+    
+    .text-gradient-light {
+        background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .hero-visual {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .dna-helix-animation i {
+        animation: float-rotate 6s ease-in-out infinite;
+    }
+    
+    @keyframes float-rotate {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(10deg); }
+    }
+    
+    .stat-card {
+        cursor: default;
+    }
+    
+    .border-gradient {
+        border: 2px solid transparent;
+        background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+                    var(--gradient-primary) border-box;
+    }
+</style>
+{% endblock %}

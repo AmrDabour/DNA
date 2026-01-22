@@ -1,0 +1,25 @@
+# Agent Service Requirements
+# ========================================
+
+# Flask Core
+Flask==3.1.0
+Flask-CORS==5.0.0
+Werkzeug==3.1.3
+
+# LangChain & LangGraph
+langchain==0.3.14
+langchain-google-genai==2.0.8
+langgraph==0.2.60
+langchain-core>=0.3.28
+
+# Google Gemini AI
+google-generativeai==0.8.4
+
+# HTTP Requests (for inter-service communication)
+requests==2.32.3
+
+# Server
+gunicorn==23.0.0
+
+# Utilities
+python-dotenv==1.0.1

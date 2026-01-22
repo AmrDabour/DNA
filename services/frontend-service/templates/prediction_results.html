@@ -1,0 +1,1016 @@
+{% extends "base.html" %}
+
+{% block title %}Prediction Results - {{ sample_id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .text-gradient-light {
+        background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .result-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--glass-border);
+        overflow: hidden;
+        transition: all 0.4s ease;
+    }
+    
+    .result-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    }
+    
+    .result-card-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--glass-border);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .result-card-header.gender {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+    }
+    
+    .result-card-header.ancestry {
+        background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(16, 185, 129, 0.2));
+    }
+    
+    .result-card-header.physical {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(34, 197, 94, 0.2));
+    }
+    
+    .result-card-header.disease {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.2));
+    }
+    
+    .result-card-header.image {
+        background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(14, 165, 233, 0.2));
+    }
+    
+    .result-card-header.raw {
+        background: linear-gradient(135deg, rgba(71, 85, 105, 0.2), rgba(100, 116, 139, 0.2));
+    }
+    
+    .result-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        color: white;
+    }
+    
+    .result-icon.gender { background: var(--gradient-primary); }
+    .result-icon.ancestry { background: linear-gradient(135deg, #06b6d4, #10b981); }
+    .result-icon.physical { background: linear-gradient(135deg, #10b981, #22c55e); }
+    .result-icon.disease { background: linear-gradient(135deg, #8b5cf6, #a855f7); }
+    .result-icon.image { background: linear-gradient(135deg, #06b6d4, #0ea5e9); }
+    .result-icon.raw { background: linear-gradient(135deg, #475569, #64748b); }
+    
+    .result-card-body {
+        padding: 1.5rem;
+    }
+    
+    .prediction-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .prediction-badge.success {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(34, 197, 94, 0.15));
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #10b981;
+    }
+    
+    .correct-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.9rem;
+    }
+    
+    .correct-badge.correct {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+    
+    .correct-badge.incorrect {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+    
+    .info-alert {
+        background: var(--bg-secondary);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        border: 1px solid var(--glass-border);
+    }
+    
+    .action-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: var(--radius-lg);
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+    }
+    
+    .loading-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-lg);
+    }
+    
+    .table-modern th {
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 1rem;
+        border-bottom: 2px solid var(--glass-border);
+    }
+    
+    .table-modern td {
+        padding: 1rem;
+        vertical-align: middle;
+    }
+    
+    .table-modern tbody tr {
+        transition: all 0.3s ease;
+    }
+    
+    .table-modern tbody tr:hover {
+        background: rgba(99, 102, 241, 0.05);
+    }
+    
+    .confidence-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: var(--bg-secondary);
+        overflow: hidden;
+    }
+    
+    .confidence-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        background: var(--gradient-primary);
+        transition: width 1s ease;
+    }
+    
+    .raw-json-toggle {
+        padding: 0.5rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--glass-border);
+        background: transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .raw-json-toggle:hover {
+        background: var(--bg-secondary);
+    }
+    
+    .raw-json-pre {
+        background: var(--bg-secondary);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    
+    .physical-traits-content {
+        white-space: pre-line;
+        line-height: 1.6;
+    }
+
+    .characteristic-header h4,
+    .disease-report-header h4 {
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .card .card-header h5 {
+        font-size: 1.1rem;
+    }
+
+    .card p strong {
+        color: var(--primary-color);
+    }
+
+    /* Disease risk report styling */
+    .disease-card {
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .disease-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .risk-badge {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.7rem;
+    }
+
+    .recommendations-list {
+        padding-left: 1.5rem;
+    }
+
+    .recommendations-list li {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Generated person image styling */
+    .generated-image-container {
+        text-align: center;
+        padding: 1.5rem;
+    }
+
+    .generated-image-container img {
+        border-radius: 10px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease;
+    }
+
+    .generated-image-container img:hover {
+        transform: scale(1.02);
+    }
+
+    #image-generation-container .alert-info {
+        border-left: 4px solid #17a2b8;
+    }
+    
+    /* Export Buttons */
+    .export-buttons .btn {
+        transition: all 0.3s ease;
+        font-weight: 600;
+    }
+    
+    .export-buttons .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    #export-pdf-btn {
+        background: white;
+        color: #1f2937;
+    }
+    
+    #export-pdf-btn:hover {
+        background: #f3f4f6;
+    }
+    
+    /* Toast Animation */
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    /* Print/PDF styles */
+    @media print {
+        .export-buttons,
+        .navbar,
+        #scrollToTop,
+        .animated-bg,
+        #particles-container {
+            display: none !important;
+        }
+        
+        .result-card {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" id="results-content">
+    <!-- Hero Banner -->
+    <section class="hero-section mb-5" data-aos="fade-up">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <div class="hero-badge">
+                    <i class="fas fa-dna"></i>
+                    <span>Analysis Complete</span>
+                </div>
+                <h1 class="display-5 fw-bold text-white mb-3">
+                    Results for <span class="text-gradient-light">{{ sample_id }}</span>
+                </h1>
+                <p class="lead text-white-50 mb-0">
+                    Comprehensive genetic analysis with AI-powered predictions.
+                </p>
+            </div>
+            <div class="export-buttons d-flex flex-wrap gap-2">
+                <button id="export-pdf-btn" class="btn btn-light btn-lg" onclick="exportToPDF()">
+                    <i class="fas fa-file-pdf me-2 text-danger"></i>Export PDF
+                </button>
+                <button id="export-json-btn" class="btn btn-outline-light" onclick="exportToJSON()">
+                    <i class="fas fa-download me-2"></i>Export JSON
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <div class="row g-4 mb-4">
+        {% if results.gender %}
+        <!-- Gender Prediction Card -->
+        <div class="col-md-6" data-aos="fade-up" data-aos-delay="100">
+            <div class="result-card h-100">
+                <div class="result-card-header gender">
+                    <div class="result-icon gender">
+                        <i class="fas fa-venus-mars"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Gender Prediction</h5>
+                        <small class="text-muted">ML-based analysis</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    <div class="mb-3">
+                        <span class="text-muted d-block mb-2">Predicted Gender</span>
+                        <span class="prediction-badge success">
+                            {% if results.gender.predicted == 'Male' %}
+                            <i class="fas fa-mars"></i>
+                            {% else %}
+                            <i class="fas fa-venus"></i>
+                            {% endif %}
+                            {{ results.gender.predicted }}
+                        </span>
+                    </div>
+
+                    {% if results.gender.true %}
+                    <hr>
+                    <div class="mt-3">
+                        <h6 class="fw-bold mb-2">Ground Truth</h6>
+                        <p class="mb-2"><strong>True Gender:</strong> {{ results.gender.true }}</p>
+                        <span class="correct-badge {% if results.gender.correct %}correct{% else %}incorrect{% endif %}">
+                            {% if results.gender.correct %}
+                            <i class="fas fa-check-circle"></i> Correct Prediction
+                            {% else %}
+                            <i class="fas fa-times-circle"></i> Incorrect Prediction
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if results.ancestry %}
+        <!-- Ancestry Prediction Card -->
+        <div class="col-md-6" data-aos="fade-up" data-aos-delay="200">
+            <div class="result-card h-100">
+                <div class="result-card-header ancestry">
+                    <div class="result-icon ancestry">
+                        <i class="fas fa-globe"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Ancestry Prediction</h5>
+                        <small class="text-muted">Population analysis</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    <div class="mb-3">
+                        <span class="text-muted d-block mb-2">Predicted Ancestry</span>
+                        <span class="prediction-badge success">
+                            <i class="fas fa-map-marker-alt"></i>
+                            {{ results.ancestry.predicted }} ({{ results.ancestry.code }})
+                        </span>
+                    </div>
+                    <p class="text-muted mb-0"><strong>Description:</strong> {{ results.ancestry.description }}</p>
+
+                    {% if results.ancestry.true %}
+                    <hr>
+                    <div class="mt-3">
+                        <h6 class="fw-bold mb-2">Ground Truth</h6>
+                        <p class="mb-1"><strong>True Ancestry:</strong> {{ results.ancestry.true }} 
+                            {% if results.ancestry.true_code %}({{ results.ancestry.true_code }}){% endif %}
+                        </p>
+                        {% if results.ancestry.true_description %}
+                        <p class="mb-2"><strong>Description:</strong> {{ results.ancestry.true_description }}</p>
+                        {% endif %}
+                        <span class="correct-badge {% if results.ancestry.correct %}correct{% else %}incorrect{% endif %}">
+                            {% if results.ancestry.correct %}
+                            <i class="fas fa-check-circle"></i> Correct Prediction
+                            {% else %}
+                            <i class="fas fa-times-circle"></i> Incorrect Prediction
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Physical Characteristics -->
+    {% if gemini_prediction %}
+    <div class="row mb-4">
+        <div class="col-12" data-aos="fade-up" data-aos-delay="300">
+            <div class="result-card">
+                <div class="result-card-header physical">
+                    <div class="result-icon physical">
+                        <i class="fas fa-portrait"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Physical Characteristics</h5>
+                        <small class="text-muted">AI-powered prediction</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    {% if gemini_prediction.success %}
+                    {{ gemini_prediction.characteristics | safe }}
+                    {% else %}
+                    <div class="info-alert">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                            <div>
+                                <h5 class="mb-1 fw-bold">Prediction Error</h5>
+                                <p class="mb-2 text-muted">{{ gemini_prediction.error }}</p>
+                                <button id="retry-gemini" class="btn btn-primary action-btn">
+                                    <i class="fas fa-sync me-2"></i>Retry
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row mb-4">
+        <div class="col-12" data-aos="fade-up" data-aos-delay="300">
+            <div class="result-card">
+                <div class="result-card-header physical">
+                    <div class="result-icon physical">
+                        <i class="fas fa-portrait"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Physical Characteristics</h5>
+                        <small class="text-muted">AI-powered prediction</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    <div class="info-alert">
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <i class="fas fa-info-circle fa-2x text-info"></i>
+                            <div class="flex-grow-1">
+                                <h5 class="mb-1 fw-bold">Request Physical Characteristics</h5>
+                                <p class="mb-2 text-muted">Use genetic prediction results to predict physical characteristics.</p>
+                            </div>
+                            <button id="predict-physical" class="btn btn-success action-btn">
+                                <i class="fas fa-magic me-2"></i>Predict Now
+                            </button>
+                        </div>
+                        <div id="prediction-loading" class="loading-indicator mt-3" style="display: none;">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                            <span>Analyzing genetic markers...</span>
+                        </div>
+                        <div id="prediction-result" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Disease Risk Assessment -->
+    {% if disease_report and disease_report.success %}
+    <!-- Pre-loaded Disease Risk Report from History -->
+    <div class="row mb-4">
+        <div class="col-12" data-aos="fade-up" data-aos-delay="400">
+            <div class="result-card">
+                <div class="result-card-header disease">
+                    <div class="result-icon disease">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Genetic Disease Risk</h5>
+                        <small class="text-muted">Health risk assessment</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    {{ disease_report.report | safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Disease Risk Assessment - Generate on demand -->
+    <div class="row mb-4">
+        <div class="col-12" data-aos="fade-up" data-aos-delay="400">
+            <div class="result-card">
+                <div class="result-card-header disease">
+                    <div class="result-icon disease">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Genetic Disease Risk</h5>
+                        <small class="text-muted">Health risk assessment</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    <div id="disease-report-container">
+                        <div class="info-alert">
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <i class="fas fa-file-medical-alt fa-2x text-purple"></i>
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-1 fw-bold">Generate Disease Risk Report</h5>
+                                    <p class="mb-2 text-muted">Analyze potential genetic disease risks based on ancestry and gender.</p>
+                                </div>
+                                <button id="predict-disease-risk" class="btn btn-primary action-btn" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); border: none;">
+                                    <i class="fas fa-file-medical-alt me-2"></i>Generate Report
+                                </button>
+                            </div>
+                            <div id="disease-loading" class="loading-indicator mt-3" style="display: none;">
+                                <div class="spinner-border text-purple spinner-border-sm" role="status"></div>
+                                <span>Analyzing genetic disease risks...</span>
+                            </div>
+                        </div>
+                        <div id="disease-result" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- AI Image Generation -->
+    {% if generated_image and generated_image.success %}
+    <!-- Pre-loaded Generated Image from History -->
+    <div class="row mb-4" id="image-generation-section">
+        <div class="col-12" data-aos="fade-up" data-aos-delay="500">
+            <div class="result-card">
+                <div class="result-card-header image">
+                    <div class="result-icon image">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">AI Person Image</h5>
+                        <small class="text-muted">Generated portrait</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Generated Person Image</h5>
+                        </div>
+                        <div class="card-body text-center">
+                            <img src="{{ url_for('serve_upload', filename=generated_image.image_filename) }}" 
+                                 alt="Generated Person Portrait" 
+                                 class="img-fluid rounded shadow-lg" 
+                                 style="max-width: 400px; max-height: 400px; object-fit: cover;"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                            <div style="display: none;" class="alert alert-warning mt-3">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Image file not found. The image may have been moved or deleted.
+                            </div>
+                            <div class="mt-3">
+                                <p class="text-muted">{{ generated_image.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- AI Image Generation - Generate on demand -->
+    <div class="row mb-4" id="image-generation-section" style="{% if not gemini_prediction or not gemini_prediction.success %}display: none;{% endif %}">
+        <div class="col-12" data-aos="fade-up" data-aos-delay="500">
+            <div class="result-card">
+                <div class="result-card-header image">
+                    <div class="result-icon image">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">AI Person Image</h5>
+                        <small class="text-muted">Generated portrait</small>
+                    </div>
+                </div>
+                <div class="result-card-body">
+                    <div id="image-generation-container">
+                        <div class="info-alert">
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <i class="fas fa-image fa-2x text-info"></i>
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-1 fw-bold">Generate Portrait Image</h5>
+                                    <p class="mb-2 text-muted">Create an AI portrait based on predicted characteristics.</p>
+                                </div>
+                                <button id="generate-person-image" class="btn btn-info text-white action-btn">
+                                    <i class="fas fa-image me-2"></i>Generate Image
+                                </button>
+                            </div>
+                            <div id="image-loading" class="loading-indicator mt-3" style="display: none;">
+                                <div class="spinner-border text-info spinner-border-sm" role="status"></div>
+                                <span>Generating person image... This may take a moment...</span>
+                            </div>
+                        </div>
+                        <div id="image-result" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Back Button -->
+    <div class="mb-4" data-aos="fade-up">
+        <a href="/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Home
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- html2pdf Library for PDF Export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+    // PDF Export Function
+    function exportToPDF() {
+        const exportBtn = document.getElementById('export-pdf-btn');
+        const originalText = exportBtn.innerHTML;
+        
+        // Show loading state
+        exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating PDF...';
+        exportBtn.disabled = true;
+        
+        // Get the content to export
+        const element = document.getElementById('results-content');
+        const sampleId = '{{ sample_id }}';
+        
+        // Create a clone to modify for PDF (without buttons)
+        const clone = element.cloneNode(true);
+        
+        // Remove elements that shouldn't be in PDF
+        const buttonsToRemove = clone.querySelectorAll('.export-buttons, #scrollToTop, .raw-json-toggle, #rawJsonData, .loading-indicator, #predict-physical, #predict-disease-risk, #generate-person-image, #retry-gemini');
+        buttonsToRemove.forEach(btn => btn.remove());
+        
+        // Add print-friendly header
+        const header = document.createElement('div');
+        header.innerHTML = `
+            <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #6366f1;">
+                <h1 style="color: #6366f1; margin-bottom: 5px;">🧬 Genova AI Analysis Report</h1>
+                <p style="color: #666; font-size: 14px;">Generated on ${new Date().toLocaleString()}</p>
+            </div>
+        `;
+        clone.insertBefore(header, clone.firstChild);
+        
+        // Configure PDF options
+        const opt = {
+            margin: [10, 10, 10, 10],
+            filename: `${sampleId}_genetic_analysis_report.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                letterRendering: true
+            },
+            jsPDF: { 
+                unit: 'mm', 
+                format: 'a4', 
+                orientation: 'portrait' 
+            },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+        
+        // Generate PDF
+        html2pdf().set(opt).from(clone).save().then(() => {
+            // Restore button state
+            exportBtn.innerHTML = originalText;
+            exportBtn.disabled = false;
+            
+            // Show success message
+            showToast('PDF exported successfully!', 'success');
+        }).catch(err => {
+            console.error('PDF Export Error:', err);
+            exportBtn.innerHTML = originalText;
+            exportBtn.disabled = false;
+            showToast('Error exporting PDF. Please try again.', 'error');
+        });
+    }
+    
+    // JSON Export Function
+    function exportToJSON() {
+        const sampleId = '{{ sample_id }}';
+        const results = {{ results | tojson | safe }};
+        {% if full_results %}
+        const fullResults = {{ full_results | tojson | safe }};
+        {% else %}
+        const fullResults = null;
+        {% endif %}
+        
+        const exportData = {
+            sample_id: sampleId,
+            export_date: new Date().toISOString(),
+            predictions: results,
+            detailed_results: fullResults
+        };
+        
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        
+        const exportName = `${sampleId}_analysis_data.json`;
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportName);
+        linkElement.click();
+        
+        showToast('JSON exported successfully!', 'success');
+    }
+    
+    // Toast notification function
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification toast-${type}`;
+        toast.innerHTML = `
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+            <span>${message}</span>
+        `;
+        
+        // Add styles inline for the toast
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px 25px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            background: ${type === 'success' ? 'linear-gradient(135deg, #10b981, #22c55e)' : type === 'error' ? 'linear-gradient(135deg, #ef4444, #f87171)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)'};
+            color: white;
+            font-weight: 500;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Handle predict physical characteristics button
+        const predictBtn = document.getElementById('predict-physical');
+        if (predictBtn) {
+            predictBtn.addEventListener('click', function () {
+                const loadingEl = document.getElementById('prediction-loading');
+                const resultEl = document.getElementById('prediction-result');
+
+                loadingEl.style.display = 'block';
+                resultEl.innerHTML = '';
+
+                // Get the prediction data from the page
+                const genderPrediction = {{ results.gender | tojson if results.gender else 'null'
+            }};
+        const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null'
+    }};
+        const sampleId = '{{ sample_id }}';
+
+                // Call the API
+                fetch('/get_physical_characteristics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        gender: genderPrediction,
+                        ancestry: ancestryPrediction,
+                        sample_id: sampleId
+                    }),
+                })
+        .then(response => response.json())
+        .then(data => {
+            loadingEl.style.display = 'none';
+
+            if (data.success) {
+                // Display the HTML content directly
+                resultEl.innerHTML = data.characteristics;
+                
+                // Show the image generation section after successful physical characteristics prediction
+                const imageSection = document.getElementById('image-generation-section');
+                if (imageSection) {
+                    imageSection.style.display = 'block';
+                }
+            } else {
+                // Show error
+                resultEl.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                                <p>${data.error}</p>
+                            </div>
+                        `;
+            }
+        })
+        .catch(error => {
+            loadingEl.style.display = 'none';
+            resultEl.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                            <p>Failed to connect to the server. Please try again later.</p>
+                        </div>
+                    `;
+            console.error('Error:', error);
+        });
+            });
+        }
+
+    // Handle predict disease risk button
+    const predictDiseaseBtn = document.getElementById('predict-disease-risk');
+    if (predictDiseaseBtn) {
+        predictDiseaseBtn.addEventListener('click', function () {
+            const loadingEl = document.getElementById('disease-loading');
+            const resultEl = document.getElementById('disease-result');
+
+            loadingEl.style.display = 'block';
+            resultEl.innerHTML = '';
+
+            // Get the prediction data from the page
+            const genderPrediction = {{ results.gender | tojson if results.gender else 'null'
+        }};
+    const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null' }};
+    const patientIdForDisease = '{{ sample_id }}';
+
+            // Call the API
+            fetch('/get_disease_risk_report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gender: genderPrediction,
+                    ancestry: ancestryPrediction,
+                    sample_id: patientIdForDisease
+                }),
+            })
+        .then(response => response.json())
+        .then(data => {
+            loadingEl.style.display = 'none';
+
+            if (data.success) {
+                // Display the HTML content directly
+                resultEl.innerHTML = data.report;
+            } else {
+                // Show error
+                resultEl.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                                <p>${data.error}</p>
+                            </div>
+                        `;
+            }
+        })
+        .catch(error => {
+            loadingEl.style.display = 'none';
+            resultEl.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                            <p>Failed to connect to the server. Please try again later.</p>
+                        </div>
+                    `;
+            console.error('Error:', error);
+        });
+            });
+        }
+
+    // Handle generate person image button
+    const generateImageBtn = document.getElementById('generate-person-image');
+    if (generateImageBtn) {
+        generateImageBtn.addEventListener('click', function () {
+            const loadingEl = document.getElementById('image-loading');
+            const resultEl = document.getElementById('image-result');
+
+            loadingEl.style.display = 'block';
+            resultEl.innerHTML = '';
+
+            // Get the prediction data from the page
+            const genderPrediction = {{ results.gender | tojson if results.gender else 'null' }};
+            const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null' }};
+
+            // Extract gender and population values
+            const gender = genderPrediction ? genderPrediction.predicted : 'Unknown';
+            const population = ancestryPrediction ? ancestryPrediction.predicted : 'Unknown';
+            const patientId = '{{ sample_id }}';
+
+            // Call the API
+            fetch('/api/predictions/generate-person-image', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gender: gender,
+                    population: population,
+                    patient_id: patientId
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingEl.style.display = 'none';
+
+                if (data.success) {
+                    // Display the generated image
+                    resultEl.innerHTML = `
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Generated Person Image</h5>
+                            </div>
+                            <div class="card-body text-center">
+                                <img src="${data.image_data}" alt="Generated Person Portrait" 
+                                     class="img-fluid rounded shadow-lg" 
+                                     style="max-width: 400px; max-height: 400px; object-fit: cover;">
+                                <div class="mt-3">
+                                    <p class="text-muted">${data.description || 'AI-generated portrait based on genetic predictions'}</p>
+                                    <p><strong>Gender:</strong> ${data.gender} | <strong>Ancestry:</strong> ${data.population}</p>
+                                    <a href="${data.image_data}" download="${patientId}_portrait.png" class="btn btn-primary mt-2">
+                                        <i class="fas fa-download me-2"></i>Download Image
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Show error
+                    resultEl.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                            <p>${data.error}</p>
+                            ${data.response_text ? '<p><strong>Model Response:</strong> ' + data.response_text + '</p>' : ''}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                loadingEl.style.display = 'none';
+                resultEl.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                        <p>Failed to connect to the server. Please try again later.</p>
+                    </div>
+                `;
+                console.error('Error:', error);
+            });
+        });
+    }
+
+    // Handle retry button
+    const retryBtn = document.getElementById('retry-gemini');
+    if (retryBtn) {
+        retryBtn.addEventListener('click', function () {
+            window.location.reload();
+        });
+    }
+    });
+</script>
+{% endblock %}
