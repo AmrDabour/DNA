@@ -88,10 +88,8 @@ if wait_for_mongodb():
                 sys.path.insert(0, scripts_path)
             
             from seed_snp_database import seed_snp_database
-            if seed_snp_database(skip_existing=True):
-                print("✅ SNP database auto-seeded successfully!")
-            else:
-                print("⚠️ SNP database seeding failed, but continuing...")
+            # Note: seed function will prompt if data exists, skip in production
+            print("💡 Run 'docker exec genovaai-app python scripts/seed_snp_database.py --force' to seed manually")
         else:
             print(f"✅ MongoDB SNP database ready ({existing_count} SNPs)")
     except Exception as e:
