@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Database, Filter, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Search, Database, Filter, ChevronLeft, ChevronRight, X, Activity } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -144,6 +145,40 @@ export default function SNPDatabasePage() {
           </Card>
         </div>
 
+        {/* Quick Search Tags */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm text-white/60">Quick Search:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Eye Color', trait: 'Eye Color' },
+                { label: 'Skin', trait: 'Skin' },
+                { label: "Alzheimer's", trait: "Alzheimer's" },
+                { label: 'Diabetes', trait: 'Diabetes' },
+                { label: 'Heart Disease', trait: 'Heart Disease' },
+                { label: 'Cancer', trait: 'Cancer' },
+                { label: 'Obesity', trait: 'Obesity' },
+                { label: 'Height', trait: 'Height' },
+              ].map((tag) => (
+                <button
+                  key={tag.trait}
+                  onClick={() => handleFilterChange('trait', tag.trait)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition-all',
+                    filters.trait === tag.trait
+                      ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-lg'
+                      : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-white/10'
+                  )}
+                >
+                  {tag.label}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Search & Filters */}
         <Card className="mb-8">
           <CardContent className="p-6">
@@ -247,15 +282,23 @@ export default function SNPDatabasePage() {
                           <td>{snp.chromosome}</td>
                           <td className="font-mono text-sm">{snp.position?.toLocaleString()}</td>
                           <td>
-                            <Badge variant="danger">{snp.risk_allele}</Badge>
+                            <Badge 
+                              variant={snp.risk_allele ? 'danger' : 'default'}
+                              className="font-mono"
+                            >
+                              {snp.risk_allele || 'N/A'}
+                            </Badge>
                           </td>
                           <td>
                             <div className="flex flex-wrap gap-1">
                               {snp.disease_associations?.slice(0, 2).map((disease, i) => (
-                                <Badge key={i} variant="warning">{disease}</Badge>
+                                <Badge key={i} variant="warning" className="text-xs">{disease}</Badge>
                               ))}
                               {snp.disease_associations?.length > 2 && (
-                                <Badge>+{snp.disease_associations.length - 2}</Badge>
+                                <Badge className="text-xs">+{snp.disease_associations.length - 2}</Badge>
+                              )}
+                              {(!snp.disease_associations || snp.disease_associations.length === 0) && (
+                                <span className="text-white/40 text-xs">None</span>
                               )}
                             </div>
                           </td>
@@ -270,27 +313,67 @@ export default function SNPDatabasePage() {
                   </table>
                 </div>
 
-                {/* Pagination */}
+                {/* Modern Pagination */}
                 {pagination.pages > 1 && (
-                  <div className="flex items-center justify-between p-4 border-t border-white/10">
-                    <p className="text-sm text-white/60">
-                      Page {pagination.page} of {pagination.pages}
-                    </p>
-                    <div className="flex gap-2">
+                  <div className="flex items-center justify-between p-6 border-t border-white/10 bg-white/5">
+                    <div className="text-sm text-white/60">
+                      Showing <span className="text-white font-semibold">
+                        {((pagination.page - 1) * pagination.per_page) + 1}
+                      </span> to{' '}
+                      <span className="text-white font-semibold">
+                        {Math.min(pagination.page * pagination.per_page, pagination.total)}
+                      </span> of{' '}
+                      <span className="text-white font-semibold">{pagination.total}</span> results
+                    </div>
+                    <div className="flex items-center gap-2">
                       <Button
                         variant="secondary"
                         size="sm"
                         disabled={pagination.page === 1}
                         onClick={() => handleFilterChange('page', pagination.page - 1)}
+                        className="disabled:opacity-30"
                       >
                         <ChevronLeft className="w-4 h-4" />
                         Previous
                       </Button>
+                      
+                      {/* Page Numbers */}
+                      <div className="flex gap-1">
+                        {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                          let pageNum;
+                          if (pagination.pages <= 5) {
+                            pageNum = i + 1;
+                          } else if (pagination.page <= 3) {
+                            pageNum = i + 1;
+                          } else if (pagination.page >= pagination.pages - 2) {
+                            pageNum = pagination.pages - 4 + i;
+                          } else {
+                            pageNum = pagination.page - 2 + i;
+                          }
+                          
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => handleFilterChange('page', pageNum)}
+                              className={cn(
+                                'w-9 h-9 rounded-lg text-sm font-medium transition-all',
+                                pagination.page === pageNum
+                                  ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-lg'
+                                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-white/10'
+                              )}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
                       <Button
                         variant="secondary"
                         size="sm"
                         disabled={pagination.page === pagination.pages}
                         onClick={() => handleFilterChange('page', pagination.page + 1)}
+                        className="disabled:opacity-30"
                       >
                         Next
                         <ChevronRight className="w-4 h-4" />
@@ -305,68 +388,114 @@ export default function SNPDatabasePage() {
 
         {/* SNP Detail Modal */}
         {selectedSnp && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="modal-backdrop" onClick={() => setSelectedSnp(null)} />
-            <div className="modal-content relative z-10 max-w-2xl">
-              <div className="flex items-start justify-between mb-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div 
+              className="modal-backdrop" 
+              onClick={() => setSelectedSnp(null)}
+            />
+            <div className="modal-content relative z-10 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 p-6 flex items-start justify-between z-10">
                 <div>
-                  <h2 className="text-2xl font-bold text-white font-mono">{selectedSnp.rs_id}</h2>
-                  <p className="text-white/60">{selectedSnp.gene_name} ({selectedSnp.gene_symbol})</p>
+                  <h2 className="text-2xl font-bold text-white font-mono mb-1">{selectedSnp.rs_id}</h2>
+                  <p className="text-white/60">
+                    {selectedSnp.gene_name} ({selectedSnp.gene_symbol})
+                  </p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedSnp(null)}>
+                <button
+                  onClick={() => setSelectedSnp(null)}
+                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                >
                   <X className="w-5 h-5" />
-                </Button>
+                </button>
               </div>
               
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="glass-card p-4">
-                    <div className="text-sm text-white/60 mb-1">Chromosome</div>
-                    <div className="text-lg font-semibold text-white">{selectedSnp.chromosome}</div>
+              <div className="p-6 space-y-6">
+                {/* Key Information Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="glass-card p-4 border-l-4 border-l-blue-500">
+                    <div className="text-xs text-white/60 mb-1 uppercase tracking-wider">Chromosome</div>
+                    <div className="text-xl font-bold text-white">{selectedSnp.chromosome}</div>
                   </div>
-                  <div className="glass-card p-4">
-                    <div className="text-sm text-white/60 mb-1">Position</div>
-                    <div className="text-lg font-semibold text-white font-mono">
+                  <div className="glass-card p-4 border-l-4 border-l-purple-500">
+                    <div className="text-xs text-white/60 mb-1 uppercase tracking-wider">Position</div>
+                    <div className="text-xl font-bold text-white font-mono">
                       {selectedSnp.position?.toLocaleString()}
                     </div>
                   </div>
-                  <div className="glass-card p-4">
-                    <div className="text-sm text-white/60 mb-1">Risk Allele</div>
-                    <div className="text-lg font-semibold text-red-400">{selectedSnp.risk_allele}</div>
+                  <div className="glass-card p-4 border-l-4 border-l-red-500">
+                    <div className="text-xs text-white/60 mb-1 uppercase tracking-wider">Risk Allele</div>
+                    <div className="text-xl font-bold text-red-400 font-mono">{selectedSnp.risk_allele || 'N/A'}</div>
                   </div>
-                  <div className="glass-card p-4">
-                    <div className="text-sm text-white/60 mb-1">Odds Ratio</div>
-                    <div className="text-lg font-semibold text-white">{selectedSnp.odds_ratio}</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="text-sm text-white/60 mb-2">Description</div>
-                  <p className="text-white/80">{selectedSnp.description}</p>
-                </div>
-                
-                <div>
-                  <div className="text-sm text-white/60 mb-2">Disease Associations</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSnp.disease_associations?.map((disease, i) => (
-                      <Badge key={i} variant="warning">{disease}</Badge>
-                    ))}
+                  <div className="glass-card p-4 border-l-4 border-l-emerald-500">
+                    <div className="text-xs text-white/60 mb-1 uppercase tracking-wider">Odds Ratio</div>
+                    <div className="text-xl font-bold text-white">{selectedSnp.odds_ratio || 'N/A'}</div>
                   </div>
                 </div>
                 
-                <div>
-                  <div className="text-sm text-white/60 mb-2">Associated Traits</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSnp.associated_traits?.map((trait, i) => (
-                      <Badge key={i} variant="primary">{trait}</Badge>
-                    ))}
+                {/* Description */}
+                {selectedSnp.description && (
+                  <div className="glass-card p-5">
+                    <div className="text-sm font-semibold text-white/80 mb-2 flex items-center gap-2">
+                      <Database className="w-4 h-4" />
+                      Description
+                    </div>
+                    <p className="text-white/70 leading-relaxed">{selectedSnp.description}</p>
                   </div>
-                </div>
+                )}
                 
-                <div className="pt-4 border-t border-white/10">
-                  <Badge variant={selectedSnp.clinical_significance === 'Risk factor' ? 'danger' : 'success'}>
-                    {selectedSnp.clinical_significance}
-                  </Badge>
+                {/* Disease Associations */}
+                {selectedSnp.disease_associations && selectedSnp.disease_associations.length > 0 && (
+                  <div>
+                    <div className="text-sm font-semibold text-white/80 mb-3 flex items-center gap-2">
+                      <Filter className="w-4 h-4" />
+                      Disease Associations
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSnp.disease_associations.map((disease, i) => (
+                        <Badge key={i} variant="warning" className="text-sm py-1.5 px-3">
+                          {disease}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Associated Traits */}
+                {selectedSnp.associated_traits && selectedSnp.associated_traits.length > 0 && (
+                  <div>
+                    <div className="text-sm font-semibold text-white/80 mb-3 flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      Associated Traits
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSnp.associated_traits.map((trait, i) => (
+                        <Badge key={i} variant="primary" className="text-sm py-1.5 px-3">
+                          {trait}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Clinical Significance */}
+                <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-white/60 mb-1">Clinical Significance</div>
+                    <Badge 
+                      variant={
+                        selectedSnp.clinical_significance?.toLowerCase().includes('risk') ? 'danger' : 
+                        selectedSnp.clinical_significance?.toLowerCase().includes('protective') ? 'success' :
+                        selectedSnp.clinical_significance?.toLowerCase().includes('drug') ? 'warning' : 'default'
+                      }
+                      className="text-sm py-1.5 px-4"
+                    >
+                      {selectedSnp.clinical_significance || 'Not specified'}
+                    </Badge>
+                  </div>
+                  <Button variant="secondary" onClick={() => setSelectedSnp(null)}>
+                    Close
+                  </Button>
                 </div>
               </div>
             </div>
@@ -376,4 +505,5 @@ export default function SNPDatabasePage() {
     </div>
   );
 }
+
 

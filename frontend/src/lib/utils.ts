@@ -94,3 +94,4 @@ export function getRiskLabel(risk: number): string {
   return 'High';
 }
 
+

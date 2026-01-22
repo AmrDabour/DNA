@@ -2,33 +2,36 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Home, 
   Upload, 
   Database, 
   Activity, 
   MessageSquare, 
-  History, 
-  Users,
+  History,
   Menu,
   X,
   LogIn,
-  UserPlus,
   LogOut,
   User,
-  Dna
+  Dna,
+  MapPin,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { NotificationDropdown } from '@/components/ui/NotificationDropdown';
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+  { href: '/ancestry-map', label: 'Ancestry Map', icon: MapPin },
   { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/samples', label: 'Samples', icon: Users },
+  { href: '/snp-query', label: 'SNP Query', icon: Database },
   { href: '/snp-database', label: 'SNP Database', icon: Database },
   { href: '/risk-calculator', label: 'Risk Calculator', icon: Activity },
   { href: '/chat', label: 'AI Assistant', icon: MessageSquare },
-  { href: '/history', label: 'History', icon: History },
 ];
 
 interface NavbarProps {
@@ -41,23 +44,53 @@ interface NavbarProps {
 export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuOpen) {
+        const target = event.target as Node;
+        if (!document.querySelector('.user-menu-container')?.contains(target)) {
+          setUserMenuOpen(false);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [userMenuOpen]);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
+    <nav
+      className={cn(
+        'fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b transition-all duration-300',
+        scrolled
+          ? 'bg-slate-900/95 border-white/20 shadow-lg py-2'
+          : 'bg-slate-900/80 border-white/10 py-3'
+      )}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/25 group-hover:shadow-primary-500/40 transition-shadow">
-              <Dna className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/25 group-hover:shadow-primary-500/40 transition-all group-hover:scale-105">
+              <Dna className="w-6 h-6 text-white animate-spin-slow" />
             </div>
             <span className="text-xl font-bold text-white hidden sm:block">
-              Genova<span className="text-gradient">AI</span>
+              Genova<span className="text-gradient"> AI</span>
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-1 flex-1 justify-center">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
@@ -66,46 +99,75 @@ export function Navbar({ user }: NavbarProps) {
                   key={link.href}
                   href={link.href}
                   className={cn(
-                    'nav-link',
+                    'nav-link relative',
                     isActive && 'nav-link-active'
                   )}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{link.label}</span>
+                  {link.href === '/chat' && (
+                    <span className="pulse-dot ml-1"></span>
+                  )}
                 </Link>
               );
             })}
           </div>
 
-          {/* Auth Buttons / User Menu */}
-          <div className="hidden lg:flex items-center gap-3">
+          {/* Right Side Actions */}
+          <div className="hidden lg:flex items-center gap-2">
+            {/* Notifications */}
+            <NotificationDropdown />
+
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
+            {/* Auth Buttons / User Menu */}
             {user ? (
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/profile"
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
+              <div className="relative user-menu-container">
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-500/20 hover:bg-primary-500/30 border border-primary-500/30 transition-colors text-white text-sm"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white text-sm font-semibold">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white text-xs font-semibold">
                     {user.username.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-white/80">{user.username}</span>
-                </Link>
-                <button className="btn-secondary py-2 px-4 text-sm flex items-center gap-2">
-                  <LogOut className="w-4 h-4" />
-                  Logout
+                  <span className="hidden sm:inline">{user.username}</span>
                 </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-xl py-2 z-50">
+                    <Link
+                      href="/profile"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2 text-white/80 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-2"
+                    >
+                      <User className="w-4 h-4" />
+                      Profile
+                    </Link>
+                    <Link
+                      href="/history"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2 text-white/80 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-2"
+                    >
+                      <History className="w-4 h-4" />
+                      My History
+                    </Link>
+                    <hr className="my-2 border-white/10" />
+                    <Link
+                      href="/logout"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2 text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Logout
+                    </Link>
+                  </div>
+                )}
               </div>
             ) : (
-              <>
-                <Link href="/auth/login" className="btn-secondary py-2 px-4 text-sm flex items-center gap-2">
-                  <LogIn className="w-4 h-4" />
-                  Login
-                </Link>
-                <Link href="/auth/register" className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
-                  <UserPlus className="w-4 h-4" />
-                  Register
-                </Link>
-              </>
+              <Link href="/auth/login" className="btn-secondary py-2 px-4 text-sm flex items-center gap-2">
+                <LogIn className="w-4 h-4" />
+                Login
+              </Link>
             )}
           </div>
 
@@ -142,9 +204,20 @@ export function Navbar({ user }: NavbarProps) {
                 >
                   <Icon className="w-5 h-5" />
                   <span>{link.label}</span>
+                  {link.href === '/chat' && (
+                    <span className="pulse-dot ml-auto"></span>
+                  )}
                 </Link>
               );
             })}
+            
+            <hr className="border-white/10 my-4" />
+            
+            {/* Mobile Notifications & Theme */}
+            <div className="flex items-center gap-2 px-4 py-2">
+              <NotificationDropdown />
+              <ThemeToggle />
+            </div>
             
             <hr className="border-white/10 my-4" />
             
@@ -157,6 +230,14 @@ export function Navbar({ user }: NavbarProps) {
                 >
                   <User className="w-5 h-5" />
                   <span>Profile</span>
+                </Link>
+                <Link
+                  href="/history"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 hover:text-white hover:bg-white/5"
+                >
+                  <History className="w-5 h-5" />
+                  <span>My History</span>
                 </Link>
                 <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10">
                   <LogOut className="w-5 h-5" />
@@ -179,4 +260,5 @@ export function Navbar({ user }: NavbarProps) {
     </nav>
   );
 }
+
 

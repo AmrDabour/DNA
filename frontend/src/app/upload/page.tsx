@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Upload, FileText, X, CheckCircle, AlertCircle, Dna } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { Upload, FileText, X, CheckCircle, AlertCircle, Dna, Info, Shield, Zap } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Loading } from '@/components/ui/Loading';
 import { api } from '@/lib/api';
@@ -52,13 +52,13 @@ export default function UploadPage() {
 
   const handleFile = (file: File) => {
     // Validate file type
-    const validTypes = ['.csv', '.txt', '.vcf'];
+    const validTypes = ['.csv', '.txt', '.vcf', '.ped'];
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
     
     if (!validTypes.includes(fileExtension)) {
       setState(prev => ({
         ...prev,
-        error: 'Invalid file type. Please upload a CSV, TXT, or VCF file.',
+        error: 'Invalid file type. Please upload a CSV, TXT, VCF, or PED file.',
         file: null,
       }));
       return;
@@ -223,7 +223,7 @@ export default function UploadPage() {
                 >
                   <input
                     type="file"
-                    accept=".csv,.txt,.vcf"
+                    accept=".csv,.txt,.vcf,.ped"
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                     disabled={state.uploading}
@@ -253,8 +253,14 @@ export default function UploadPage() {
                         or click to browse
                       </div>
                       <div className="text-xs text-white/40">
-                        Supported formats: CSV, TXT, VCF (max 50MB)
+                        Supported formats: CSV, TXT, VCF, PED (max 50MB)
                       </div>
+                      {state.file && (state.file as File).name.endsWith('.ped') && (
+                        <div className="mt-2 text-xs text-primary-400 flex items-center gap-1">
+                          <Info className="w-3 h-3" />
+                          PED file will be automatically converted to CSV format
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -266,11 +272,13 @@ export default function UploadPage() {
                       <span>Uploading...</span>
                       <span>{state.progress}%</span>
                     </div>
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden relative">
                       <div
-                        className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-300 relative"
                         style={{ width: `${state.progress}%` }}
-                      />
+                      >
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full shadow-lg shadow-primary-500/40"></div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -299,22 +307,62 @@ export default function UploadPage() {
           </CardContent>
         </Card>
 
+        {/* Format Info Section */}
+        <div className="mt-8">
+          <Card className="p-6">
+            <h6 className="text-white font-semibold mb-4 text-center">File Format Requirements</h6>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="format-section p-4 bg-white/5 rounded-lg">
+                <h6 className="text-white font-medium mb-2 text-sm">CSV Format</h6>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <span className="tag px-2 py-1 bg-primary-500/20 text-primary-300 rounded-full text-xs">rsid</span>
+                  <span className="tag px-2 py-1 bg-primary-500/20 text-primary-300 rounded-full text-xs">chromosome</span>
+                  <span className="tag px-2 py-1 bg-primary-500/20 text-primary-300 rounded-full text-xs">position</span>
+                  <span className="tag px-2 py-1 bg-primary-500/20 text-primary-300 rounded-full text-xs">genotype</span>
+                </div>
+                <p className="text-xs text-white/60">Required columns for CSV files</p>
+              </div>
+              <div className="format-section p-4 bg-white/5 rounded-lg">
+                <h6 className="text-white font-medium mb-2 text-sm">PED Format</h6>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <span className="tag optional px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs">Family ID</span>
+                  <span className="tag optional px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs">Individual ID</span>
+                  <span className="tag optional px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs">Paternal ID</span>
+                  <span className="tag optional px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs">Maternal ID</span>
+                  <span className="tag optional px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs">Sex</span>
+                  <span className="tag optional px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs">Phenotype</span>
+                </div>
+                <p className="text-xs text-white/60">PED files will be automatically converted</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
         {/* Help Section */}
-        <div className="mt-8 grid md:grid-cols-3 gap-4">
+        <div className="mt-6 grid md:grid-cols-3 gap-4">
           <Card className="p-4">
-            <h3 className="text-white font-semibold mb-2">📄 File Format</h3>
+            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              File Format
+            </h3>
             <p className="text-sm text-white/60">
-              We accept CSV files with columns: rsid, chromosome, position, genotype
+              We accept CSV, PED, TXT, and VCF files with SNP data
             </p>
           </Card>
           <Card className="p-4">
-            <h3 className="text-white font-semibold mb-2">🔒 Privacy</h3>
+            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Privacy
+            </h3>
             <p className="text-sm text-white/60">
               Your data is encrypted and processed securely. We never share your genetic information.
             </p>
           </Card>
           <Card className="p-4">
-            <h3 className="text-white font-semibold mb-2">⚡ Fast Analysis</h3>
+            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              Fast Analysis
+            </h3>
             <p className="text-sm text-white/60">
               Results are typically ready within seconds using our AI-powered analysis.
             </p>
@@ -324,4 +372,5 @@ export default function UploadPage() {
     </div>
   );
 }
+
 

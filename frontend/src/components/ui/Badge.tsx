@@ -5,7 +5,7 @@ import { ReactNode } from 'react';
 
 interface BadgeProps {
   children: ReactNode;
-  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'benign' | 'risk' | 'protective' | 'drug';
   className?: string;
 }
 
@@ -16,6 +16,10 @@ export function Badge({ children, variant = 'default', className }: BadgeProps) 
     success: 'bg-green-500/20 text-green-300',
     warning: 'bg-yellow-500/20 text-yellow-300',
     danger: 'bg-red-500/20 text-red-300',
+    benign: 'bg-blue-500/20 text-blue-300',
+    risk: 'bg-red-500/20 text-red-300',
+    protective: 'bg-emerald-500/20 text-emerald-300',
+    drug: 'bg-purple-500/20 text-purple-300',
   };
 
   return (
@@ -30,4 +34,5 @@ export function Badge({ children, variant = 'default', className }: BadgeProps) 
     </span>
   );
 }
+
 

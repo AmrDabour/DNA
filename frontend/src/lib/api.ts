@@ -2,7 +2,25 @@
  * API Client for GenovaAI Backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+// For client-side requests, use the public URL
+// For server-side requests in Docker, use the internal service name
+const getApiBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    // Server-side: can use internal Docker network
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+  } else {
+    // Client-side: must use public URL
+    // In Docker, backend is exposed on port 5001, or use nginx proxy
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (envUrl && envUrl.includes('backend:')) {
+      // Docker internal URL, use localhost instead for browser
+      return 'http://localhost:5001';
+    }
+    return envUrl || 'http://localhost:5001';
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -184,6 +202,52 @@ class ApiClient {
   async getDashboardStats() {
     return this.request('/api/dashboard/stats');
   }
+
+  // Notification endpoints
+  async getNotifications() {
+    return this.request<{ notifications: unknown[]; unread_count: number }>('/api/notifications');
+  }
+
+  async getNotificationCount() {
+    return this.request<{ count: number }>('/api/notifications/count');
+  }
+
+  async markNotificationRead(notificationId: string) {
+    return this.request(`/api/notifications/${notificationId}/read`, { method: 'POST' });
+  }
+
+  async markAllNotificationsRead() {
+    return this.request('/api/notifications/mark-all-read', { method: 'POST' });
+  }
+
+  async deleteNotification(notificationId: string) {
+    return this.request(`/api/notifications/${notificationId}`, { method: 'DELETE' });
+  }
+
+  // Progress tracking endpoints
+  async getProgress(taskId: string) {
+    return this.request(`/api/progress/${taskId}`);
+  }
+
+  async updateProgress(taskId: string, data: { progress: number; message?: string; status?: string }) {
+    return this.request(`/api/progress/${taskId}/update`, {
+      method: 'POST',
+      body: data,
+    });
+  }
+
+  // Model status endpoint
+  async getModelStatus() {
+    return this.request<{ gender_loaded: boolean; ancestry_loaded: boolean; gender_model_dir?: string; ancestry_model_dir?: string }>('/api/models/status');
+  }
+
+  // Chat endpoint
+  async chat(message: string) {
+    return this.request('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
 }
 
 // Export singleton instance
@@ -191,4 +255,5 @@ export const api = new ApiClient(API_BASE_URL);
 
 // Export types
 export type { ApiResponse, RequestOptions };
+
 
