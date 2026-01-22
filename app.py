@@ -23,6 +23,7 @@ from models import GeneticPredictor, POPULATION_INFO, find_model_directories
 from services import configure_gemini
 from database import db, User, init_db, create_admin_user
 from config import get_database_url, wait_for_database, get_engine_options
+from config.mongodb import wait_for_mongodb, get_snp_collection
 
 # ============================================================
 # Flask App Setup
@@ -50,6 +51,32 @@ if os.environ.get('FLASK_ENV') == 'production':
     if not wait_for_database():
         print("❌ Could not connect to database. Exiting...")
         exit(1)
+
+# Wait for MongoDB and seed SNP database if needed
+if os.environ.get('FLASK_ENV') == 'production':
+    if wait_for_mongodb():
+        try:
+            collection = get_snp_collection()
+            existing_count = collection.count_documents({})
+            if existing_count == 0:
+                print("🌱 MongoDB SNP database is empty. Seeding initial data...")
+                # Import and run seed function
+                import sys
+                scripts_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
+                if scripts_path not in sys.path:
+                    sys.path.insert(0, scripts_path)
+                from seed_snp_database import seed_snp_database
+                if seed_snp_database(skip_existing=True):
+                    print("✅ SNP database seeded successfully!")
+                else:
+                    print("⚠️ SNP database seeding failed, but continuing...")
+            else:
+                print(f"✅ MongoDB SNP database already contains {existing_count} SNPs.")
+        except Exception as e:
+            print(f"⚠️ Could not seed MongoDB SNP database: {e}")
+            print("   Continuing without SNP database seeding...")
+    else:
+        print("⚠️ MongoDB not available. SNP database features will be limited.")
 
 # Initialize database
 init_db(app)

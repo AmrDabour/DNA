@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import current_user, login_required
 import os
 import pandas as pd
-from routes.snp_database_routes import SNP_DATABASE
+from config.mongodb import get_snp_collection
 
 risk_calculator_bp = Blueprint('risk_calculator', __name__)
 
@@ -264,38 +264,54 @@ def calculate_snp_risk_score(patient_snps, disease_name):
     matched_snps = []
     risk_score_modifier = 1.0
     
-    # Normalize disease name for matching (handle different naming conventions)
-    disease_name_lower = disease_name.lower()
-    
-    for rs_id, snp_info in SNP_DATABASE.items():
-        if rs_id in patient_snps:
-            disease_assoc = snp_info.get('disease_associations', [])
+    try:
+        collection = get_snp_collection()
+        
+        # Normalize disease name for matching (handle different naming conventions)
+        disease_name_lower = disease_name.lower()
+        
+        # Query MongoDB for SNPs that match patient SNPs and are associated with the disease
+        for rs_id in patient_snps:
+            # Normalize rs_id
+            normalized_rs_id = rs_id.lower()
+            if not normalized_rs_id.startswith('rs'):
+                normalized_rs_id = f'rs{normalized_rs_id}'
             
-            # Check if this SNP is associated with the disease (case-insensitive)
-            # Support partial matching (e.g., "cardiovascular" in "Cardiovascular Disease")
-            if any(disease_name_lower in assoc.lower() or assoc.lower() in disease_name_lower for assoc in disease_assoc):
-                patient_genotype = patient_snps[rs_id]
-                risk_allele = snp_info.get('risk_allele', '')
-                odds_ratio = snp_info.get('odds_ratio', 1.0)
+            # Find SNP in MongoDB
+            snp_info = collection.find_one({'rs_id': normalized_rs_id})
+            
+            if snp_info:
+                disease_assoc = snp_info.get('disease_associations', [])
                 
-                if odds_ratio:
-                    # Count risk alleles in genotype
-                    risk_allele_count = patient_genotype.count(risk_allele) if risk_allele else 0
+                # Check if this SNP is associated with the disease (case-insensitive)
+                # Support partial matching (e.g., "cardiovascular" in "Cardiovascular Disease")
+                if any(disease_name_lower in assoc.lower() or assoc.lower() in disease_name_lower for assoc in disease_assoc):
+                    patient_genotype = patient_snps[rs_id]
+                    risk_allele = snp_info.get('risk_allele', '')
+                    odds_ratio = snp_info.get('odds_ratio', 1.0)
                     
-                    # Apply odds ratio based on number of risk alleles
-                    if risk_allele_count == 2:  # Homozygous risk
-                        risk_score_modifier *= odds_ratio
-                    elif risk_allele_count == 1:  # Heterozygous
-                        risk_score_modifier *= (1 + (odds_ratio - 1) * 0.5)
-                    
-                    matched_snps.append({
-                        'rs_id': rs_id,
-                        'gene': snp_info.get('gene_symbol', 'Unknown'),
-                        'genotype': patient_genotype,
-                        'risk_allele': risk_allele,
-                        'odds_ratio': odds_ratio,
-                        'risk_allele_count': risk_allele_count
-                    })
+                    if odds_ratio:
+                        # Count risk alleles in genotype
+                        risk_allele_count = patient_genotype.count(risk_allele) if risk_allele else 0
+                        
+                        # Apply odds ratio based on number of risk alleles
+                        if risk_allele_count == 2:  # Homozygous risk
+                            risk_score_modifier *= odds_ratio
+                        elif risk_allele_count == 1:  # Heterozygous
+                            risk_score_modifier *= (1 + (odds_ratio - 1) * 0.5)
+                        
+                        matched_snps.append({
+                            'rs_id': rs_id,
+                            'gene': snp_info.get('gene_symbol', 'Unknown'),
+                            'genotype': patient_genotype,
+                            'risk_allele': risk_allele,
+                            'odds_ratio': odds_ratio,
+                            'risk_allele_count': risk_allele_count
+                        })
+    except Exception as e:
+        print(f"Error querying MongoDB for SNP risk calculation: {e}")
+        # Return empty results if MongoDB query fails
+        pass
     
     return matched_snps, risk_score_modifier
 

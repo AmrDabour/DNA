@@ -39,6 +39,37 @@ services:
           memory: 256M
 
   # ============================================================
+  # MongoDB Database Service
+  # ============================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: genovaai-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-genovaai_mongo_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-genovaai_mongo_password_2024}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-genovaai}
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - genovaai-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # ============================================================
   # Main Flask Application
   # ============================================================
   genovaai:
@@ -64,6 +95,13 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-genovaai_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-genovaai_secure_password_2024}
       
+      # MongoDB Configuration
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DB=${MONGO_DB:-genovaai}
+      - MONGO_USER=${MONGO_USER:-genovaai_mongo_user}
+      - MONGO_PASSWORD=${MONGO_PASSWORD:-genovaai_mongo_password_2024}
+      
       # Connection Pool Settings
       - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-20}
@@ -86,6 +124,7 @@ services:
       - ./config:/app/config:ro
       - ./new_model:/app/new_model:ro
       - ./agent:/app/agent:ro
+      - ./scripts:/app/scripts:ro
       # Persist uploads and results
       - genovaai-uploads:/app/uploads
       - genovaai-results:/app/result
@@ -93,6 +132,8 @@ services:
       - genovaai-visualizations:/app/visualizations
     depends_on:
       postgres:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/"]
@@ -155,6 +196,10 @@ volumes:
   postgres-data:
     driver: local
   postgres-backups:
+    driver: local
+  mongodb-data:
+    driver: local
+  mongodb-config:
     driver: local
   genovaai-uploads:
     driver: local
