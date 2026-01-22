@@ -15,6 +15,13 @@ try:
 except ImportError:
     SWAGGER_AVAILABLE = False
 
+# Try to import flask-cors (optional)
+try:
+    from flask_cors import CORS
+    CORS_AVAILABLE = True
+except ImportError:
+    CORS_AVAILABLE = False
+
 # Load environment variables from .env file if it exists
 load_dotenv()
 
@@ -33,6 +40,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY", "genetic_prediction_app_secret_key"
 )
+
+# Enable CORS for frontend communication
+if CORS_AVAILABLE:
+    cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": cors_origins,
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    })
+    print(f"✅ CORS enabled for origins: {cors_origins}")
 
 # Database configuration - supports both SQLite and PostgreSQL
 database_url = get_database_url()

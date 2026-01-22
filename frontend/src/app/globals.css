@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 30, 27, 75;
+}
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white min-h-screen;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Glass morphism cards */
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl;
+  }
+  
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:shadow-2xl hover:-translate-y-1;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-400 via-accent-400 to-pink-400 bg-clip-text text-transparent;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-primary-500 to-accent-500 text-white font-semibold rounded-xl
+           shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/40 
+           transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 text-white font-semibold rounded-xl
+           hover:bg-white/20 hover:border-white/30 transition-all duration-300;
+  }
+
+  /* Input field */
+  .input-field {
+    @apply w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40
+           focus:outline-none focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20 
+           transition-all duration-300;
+  }
+
+  /* Stats card */
+  .stat-card {
+    @apply glass-card p-6 text-center;
+  }
+
+  .stat-number {
+    @apply text-4xl font-bold text-gradient mb-2;
+  }
+
+  .stat-label {
+    @apply text-sm text-white/60 uppercase tracking-wider;
+  }
+
+  /* Feature card */
+  .feature-card {
+    @apply glass-card-hover p-6 flex flex-col items-start gap-4;
+  }
+
+  .feature-icon {
+    @apply w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500/20 to-accent-500/20 
+           flex items-center justify-center text-primary-400;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 
+           flex items-center gap-2 rounded-lg hover:bg-white/5;
+  }
+
+  .nav-link-active {
+    @apply text-white bg-white/10;
+  }
+
+  /* Animated background */
+  .animated-bg {
+    @apply fixed inset-0 -z-10 overflow-hidden;
+  }
+
+  .animated-bg::before {
+    content: "";
+    @apply absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-30
+           bg-gradient-to-r from-primary-500 to-accent-500 -top-32 -left-32 animate-pulse-slow;
+  }
+
+  .animated-bg::after {
+    content: "";
+    @apply absolute w-[400px] h-[400px] rounded-full blur-[100px] opacity-20
+           bg-gradient-to-r from-accent-500 to-pink-500 bottom-0 right-0 animate-pulse-slow;
+    animation-delay: 1s;
+  }
+
+  /* DNA Helix animation */
+  .dna-helix {
+    @apply relative w-20 h-40;
+  }
+
+  /* Table styles */
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-white/60 uppercase tracking-wider
+           bg-white/5 border-b border-white/10;
+  }
+
+  .data-table td {
+    @apply px-4 py-4 text-sm text-white/80 border-b border-white/5;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-white/5;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-primary-500/20 text-primary-300;
+  }
+
+  .badge-success {
+    @apply bg-green-500/20 text-green-300;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-500/20 text-yellow-300;
+  }
+
+  .badge-danger {
+    @apply bg-red-500/20 text-red-300;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    @apply w-8 h-8 border-4 border-white/20 border-t-primary-500 rounded-full animate-spin;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-40;
+  }
+
+  .modal-content {
+    @apply glass-card p-6 max-w-lg w-full mx-4 animate-scale-in;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-white/5 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-white/20 rounded-full hover:bg-white/30;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

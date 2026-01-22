@@ -48,6 +48,7 @@ flasgger>=0.9.7
 # Authentication & Database
 flask-login>=0.6.0
 flask-sqlalchemy>=3.1.0
+flask-cors>=4.0.0
 
 # PostgreSQL Support
 psycopg2-binary>=2.9.9
