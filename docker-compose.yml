@@ -116,6 +116,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
     volumes:
       # Development: Mount source code for live reload (comment out for production)
+      - ./app.py:/app/app.py:ro
       - ./routes:/app/routes:ro
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro

@@ -4,7 +4,6 @@ Populates MongoDB with SNP data from the original hardcoded dictionary
 """
 import sys
 import os
-import argparse
 from datetime import datetime
 
 # Add parent directory to path to import config
@@ -597,13 +596,8 @@ SNP_DATABASE = {
 }
 
 
-def seed_snp_database(force=False, skip_existing=False):
-    """Seed MongoDB with SNP database
-    
-    Args:
-        force: If True, clear and reseed even if data exists
-        skip_existing: If True, skip seeding if data already exists
-    """
+def seed_snp_database():
+    """Seed MongoDB with SNP database"""
     print("🌱 Starting SNP database seeding...")
     
     # Wait for MongoDB to be available
@@ -618,30 +612,13 @@ def seed_snp_database(force=False, skip_existing=False):
         existing_count = collection.count_documents({})
         if existing_count > 0:
             print(f"⚠️  Database already contains {existing_count} SNPs.")
-            
-            if force:
-                # Force reseed - clear and continue
+            response = input("Do you want to clear and reseed? (yes/no): ").strip().lower()
+            if response == 'yes':
                 collection.delete_many({})
-                print("🗑️  Cleared existing SNPs (--force flag used).")
-            elif skip_existing:
-                # Skip if data exists
-                print("ℹ️  Skipping seed. Database already populated (--skip-existing flag used).")
-                return True
+                print("🗑️  Cleared existing SNPs.")
             else:
-                # Try to get user input, but handle non-interactive environments
-                try:
-                    response = input("Do you want to clear and reseed? (yes/no): ").strip().lower()
-                    if response == 'yes':
-                        collection.delete_many({})
-                        print("🗑️  Cleared existing SNPs.")
-                    else:
-                        print("ℹ️  Skipping seed. Database already populated.")
-                        return True
-                except (EOFError, KeyboardInterrupt):
-                    # Non-interactive environment (like Docker exec)
-                    print("ℹ️  Running in non-interactive mode. Skipping seed.")
-                    print("💡 Tip: Use --force to clear and reseed, or --skip-existing to skip.")
-                    return True
+                print("ℹ️  Skipping seed. Database already populated.")
+                return True
         
         # Convert dictionary to list of documents
         snp_documents = []
@@ -681,14 +658,6 @@ def seed_snp_database(force=False, skip_existing=False):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Seed MongoDB with SNP database')
-    parser.add_argument('--force', action='store_true', 
-                       help='Clear existing data and reseed (use with caution)')
-    parser.add_argument('--skip-existing', action='store_true',
-                       help='Skip seeding if data already exists (non-interactive)')
-    
-    args = parser.parse_args()
-    
-    success = seed_snp_database(force=args.force, skip_existing=args.skip_existing)
+    success = seed_snp_database()
     sys.exit(0 if success else 1)
 
