@@ -29,7 +29,9 @@ from config.mongodb import wait_for_mongodb, get_snp_collection
 # Flask App Setup
 # ============================================================
 
-app = Flask(__name__)
+app = Flask(__name__, 
+            template_folder='web/templates',
+            static_folder='web/static')
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY", "genetic_prediction_app_secret_key"
 )

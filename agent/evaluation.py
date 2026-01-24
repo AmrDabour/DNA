@@ -482,3 +482,4 @@ def quick_evaluate_response(
         "overall_score": (accuracy.score + tool_usage.score + safety.score + quality.score) / 4
     }
 
+
