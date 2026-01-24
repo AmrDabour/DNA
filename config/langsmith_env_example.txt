@@ -1,0 +1,27 @@
+# ============================================================
+# LangSmith Configuration Example
+# ============================================================
+# Add these variables to your .env file
+# 
+# Get your API key from: https://smith.langchain.com/settings
+# ============================================================
+
+# Enable LangSmith tracing (set to "true" to enable)
+LANGCHAIN_TRACING_V2=true
+
+# Your LangSmith API key (starts with "ls__")
+LANGCHAIN_API_KEY=ls__xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Project name for organizing traces
+# This will show up in your LangSmith dashboard
+LANGCHAIN_PROJECT=dna-analysis-agent
+
+# Optional: Custom endpoint (for enterprise/self-hosted only)
+# LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+
+# ============================================================
+# Environment Setting (affects tagging in LangSmith)
+# ============================================================
+# Options: development, staging, production
+ENVIRONMENT=development
+

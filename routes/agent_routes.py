@@ -198,6 +198,173 @@ def get_status():
             status["tool_count"] = len(tools)
         except Exception as e:
             status["tools_error"] = str(e)
+        
+        # Check LangSmith status
+        try:
+            from agent.langsmith_utils import is_langsmith_available
+            status["langsmith_enabled"] = is_langsmith_available()
+        except ImportError:
+            status["langsmith_enabled"] = False
     
     return jsonify(status)
+
+
+@agent_bp.route('/metrics', methods=['GET'])
+def get_metrics():
+    """
+    Get agent performance metrics from LangSmith
+    ---
+    tags:
+      - Agent
+    parameters:
+      - name: hours
+        in: query
+        type: integer
+        default: 24
+        description: Number of hours to look back
+    """
+    try:
+        from agent.monitoring import get_monitoring_service
+        
+        hours = request.args.get("hours", 24, type=int)
+        monitoring = get_monitoring_service()
+        
+        if not monitoring.is_available():
+            return jsonify({
+                "success": False,
+                "error": "Metrics not available. Check LangSmith configuration."
+            })
+        
+        metrics = monitoring.get_metrics(hours=hours)
+        
+        if not metrics:
+            return jsonify({
+                "success": False,
+                "error": "No metrics data available for the specified time period."
+            })
+        
+        return jsonify({
+            "success": True,
+            "metrics": metrics.to_dict()
+        })
+        
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "error": "LangSmith monitoring not available. Install langsmith package."
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@agent_bp.route('/feedback', methods=['POST'])
+def submit_user_feedback():
+    """
+    Submit user feedback for a run
+    ---
+    tags:
+      - Agent
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - run_id
+            - rating
+          properties:
+            run_id:
+              type: string
+              description: The LangSmith run ID
+            rating:
+              type: integer
+              minimum: 1
+              maximum: 5
+              description: User rating (1-5 stars)
+            comment:
+              type: string
+              description: Optional feedback comment
+    """
+    try:
+        from agent.langsmith_utils import log_user_feedback
+        
+        data = request.json
+        run_id = data.get("run_id")
+        rating = data.get("rating", 3)  # 1-5 scale
+        comment = data.get("comment")
+        
+        if not run_id:
+            return jsonify({"success": False, "error": "run_id is required"})
+        
+        if not isinstance(rating, int) or rating < 1 or rating > 5:
+            return jsonify({"success": False, "error": "rating must be an integer between 1 and 5"})
+        
+        success = log_user_feedback(
+            run_id=run_id,
+            rating=rating,
+            feedback_text=comment
+        )
+        
+        return jsonify({
+            "success": success,
+            "message": "Feedback submitted successfully" if success else "Failed to submit feedback. Check LangSmith configuration."
+        })
+        
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "error": "LangSmith not available. Install langsmith package."
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@agent_bp.route('/errors', methods=['GET'])
+def get_recent_errors():
+    """
+    Get recent error traces from LangSmith
+    ---
+    tags:
+      - Agent
+    parameters:
+      - name: hours
+        in: query
+        type: integer
+        default: 24
+        description: Number of hours to look back
+      - name: limit
+        in: query
+        type: integer
+        default: 50
+        description: Maximum number of errors to return
+    """
+    try:
+        from agent.monitoring import get_monitoring_service
+        
+        hours = request.args.get("hours", 24, type=int)
+        limit = request.args.get("limit", 50, type=int)
+        
+        monitoring = get_monitoring_service()
+        
+        if not monitoring.is_available():
+            return jsonify({
+                "success": False,
+                "error": "Monitoring not available. Check LangSmith configuration."
+            })
+        
+        errors = monitoring.get_recent_errors(hours=hours, limit=limit)
+        
+        return jsonify({
+            "success": True,
+            "errors": errors,
+            "count": len(errors)
+        })
+        
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "error": "LangSmith monitoring not available."
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 

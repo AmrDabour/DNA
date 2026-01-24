@@ -55,7 +55,7 @@ class CompareSamplesInput(BaseModel):
 
 class PredictionInput(BaseModel):
     """Input schema for predictions with gender and population"""
-    Gender: str = Field(description="The Biological Gender (Male or Female)")
+    gender: str = Field(description="The gender (Male or Female)")
     population: str = Field(description="The population code (e.g., CHD, CEU, YRI)")
 
 

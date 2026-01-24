@@ -32,6 +32,14 @@ class Config:
     MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS", "10"))
     TIMEOUT_SECONDS = int(os.getenv("AGENT_TIMEOUT", "120"))
     
+    # ============================================================
+    # LangSmith Configuration
+    # ============================================================
+    LANGSMITH_ENABLED = os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true"
+    LANGSMITH_API_KEY = os.getenv("LANGCHAIN_API_KEY")
+    LANGSMITH_PROJECT = os.getenv("LANGCHAIN_PROJECT", "dna-analysis-agent")
+    LANGSMITH_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
+    
     @classmethod
     def validate(cls):
         """Validate required configuration"""
@@ -43,6 +51,11 @@ class Config:
     def get_api_key(cls):
         """Get the first available API key"""
         return cls.GEMINI_API_KEY or cls.GOOGLE_AI_API_KEY
+    
+    @classmethod
+    def is_langsmith_enabled(cls) -> bool:
+        """Check if LangSmith is properly configured"""
+        return cls.LANGSMITH_ENABLED and bool(cls.LANGSMITH_API_KEY)
 
 
 config = Config()

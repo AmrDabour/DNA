@@ -126,14 +126,38 @@ class DNAAgentWorkflow:
         self.tools = get_all_tools()
         self.tools_by_name = {tool.name: tool for tool in self.tools}
         self.graph = self._build_graph()
+        self._tracer = None
+        self._init_tracing()
+    
+    def _init_tracing(self):
+        """Initialize LangSmith tracing if available"""
+        try:
+            from .langsmith_utils import get_tracer, is_langsmith_available
+            if is_langsmith_available():
+                self._tracer = get_tracer()
+        except ImportError:
+            pass
     
     def _init_llm(self) -> ChatGoogleGenerativeAI:
-        """Initialize the LLM"""
+        """Initialize the LLM with optional LangSmith tracing"""
+        callbacks = []
+        
+        # Add LangSmith tracer if available
+        try:
+            from .langsmith_utils import get_tracer, is_langsmith_available
+            if is_langsmith_available():
+                tracer = get_tracer()
+                if tracer:
+                    callbacks.append(tracer)
+        except ImportError:
+            pass
+        
         return ChatGoogleGenerativeAI(
             model=config.MODEL_NAME,
             google_api_key=config.get_api_key(),
             temperature=config.TEMPERATURE,
-            max_output_tokens=config.MAX_TOKENS
+            max_output_tokens=config.MAX_TOKENS,
+            callbacks=callbacks if callbacks else None
         )
     
     def _get_system_prompt(self) -> str:
@@ -433,9 +457,23 @@ class DNAAgentWorkflow:
             "error": ""
         }
         
-        # Run the graph
+        # Run the graph with LangSmith tracing
         try:
-            result = self.graph.invoke(initial_state)
+            # Build config with callbacks for tracing
+            run_config = {}
+            if self._tracer:
+                run_config["callbacks"] = [self._tracer]
+                run_config["metadata"] = {
+                    "session_id": session_id,
+                    "input_length": len(user_input),
+                    "history_length": len(chat_history) if chat_history else 0
+                }
+                run_config["tags"] = ["dna-agent", "chat"]
+            
+            result = self.graph.invoke(
+                initial_state,
+                config=run_config if run_config else None
+            )
             
             return {
                 "success": True,
