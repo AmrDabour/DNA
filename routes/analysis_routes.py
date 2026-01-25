@@ -280,7 +280,7 @@ def get_snp_statistics():
 def visualizations():
     """Enhanced visualization page"""
     try:
-        from models import GeneticPredictor, find_model_directories
+        from ml_models import GeneticPredictor, find_model_directories
         
         predictor = GeneticPredictor()
         gender_model_dir, ancestry_model_dir = find_model_directories()

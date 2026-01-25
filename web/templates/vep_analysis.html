@@ -1,0 +1,1388 @@
+{% extends "base.html" %}
+
+{% block title %}VEP Analysis - Variant Effect Predictor - Genova AI{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Hero Section -->
+    <section class="hero-section mb-5" data-aos="fade-up">
+        <div class="hero-badge">
+            <i class="fas fa-microscope"></i>
+            <span>Variant Effect Predictor</span>
+        </div>
+        <h1 class="display-5 fw-bold text-white mb-3">
+            VEP <span class="text-gradient-light">Analysis</span>
+        </h1>
+        <p class="lead text-white-50 mb-0">
+            Analyze SNP functional effects, pathogenicity scores, and gene impacts using Ensembl VEP.
+        </p>
+    </section>
+
+    <!-- VEP Status Card -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3" data-aos="fade-up" data-aos-delay="100">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value {% if vep_status and vep_status.api_available %}text-success{% else %}text-danger{% endif %}" id="stat-status">
+                    {% if vep_status and vep_status.api_available %}Online{% else %}Offline{% endif %}
+                </div>
+                <div class="stat-mini-label">VEP Status</div>
+            </div>
+        </div>
+        <div class="col-md-3" data-aos="fade-up" data-aos-delay="150">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value" id="stat-response">{{ vep_status.response_time_ms or 'N/A' }}{% if vep_status.response_time_ms %}ms{% endif %}</div>
+                <div class="stat-mini-label">Response Time</div>
+            </div>
+        </div>
+        <div class="col-md-3" data-aos="fade-up" data-aos-delay="200">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value" id="stat-cache">{{ cache_stats.db_cache_entries or 0 }}</div>
+                <div class="stat-mini-label">Cached SNPs</div>
+            </div>
+        </div>
+        <div class="col-md-3" data-aos="fade-up" data-aos-delay="250">
+            <div class="stat-mini-card">
+                <div class="stat-mini-value">{{ sample_files|length }}</div>
+                <div class="stat-mini-label">Sample Files</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Form -->
+    <div class="vep-card mb-4" data-aos="fade-up">
+        <div class="vep-card-header">
+            <h5 class="mb-0"><i class="fas fa-dna me-2"></i>VEP Variant Analysis</h5>
+            <small class="text-muted">Upload your genetic data file for comprehensive variant effect prediction</small>
+        </div>
+        <div class="vep-card-body">
+            <div class="row g-4">
+                <!-- Left Side: File Upload -->
+                <div class="col-lg-7">
+                    <div class="upload-section">
+                        <div class="upload-zone" id="upload-dropzone">
+                            <input type="file" class="d-none" id="file-upload" accept=".csv,.ped">
+                            
+                            <div class="dropzone-content" id="dropzone-placeholder">
+                                <div class="upload-icon-circle">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <h5 class="fw-bold mb-2">Drag & Drop your CSV or PED file</h5>
+                                <p class="text-muted mb-3">or click to browse</p>
+                                <button type="button" class="btn btn-outline-primary" id="browse-btn">
+                                    <i class="fas fa-folder-open me-2"></i>Browse Files
+                                </button>
+                                <div class="mt-3">
+                                    <span class="format-badge">
+                                        <i class="fas fa-file-csv me-1"></i>.csv / .ped format
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="file-preview-area" id="dropzone-selected" style="display: none;">
+                                <div class="file-info-display">
+                                    <div class="file-icon-display">
+                                        <i class="fas fa-file-csv"></i>
+                                    </div>
+                                    <div class="file-details-display">
+                                        <h6 class="file-name-display" id="selected-filename">Filename.csv</h6>
+                                        <span class="file-size-display" id="selected-filesize">0 KB</span>
+                                    </div>
+                                    <button type="button" class="btn-remove-file" id="remove-file-btn">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- Right Side: Settings & Action -->
+                <div class="col-lg-5">
+                    <div class="analysis-settings">
+                        <label class="form-label mb-3">
+                            <span class="fw-bold">SNP Limit</span>
+                        </label>
+                        
+                        <div class="mb-4">
+                            <input type="number" class="form-control form-control-lg" id="snp-limit" 
+                                   value="50" min="1" max="10000" placeholder="50">
+                        </div>
+                        
+                        <button type="button" class="btn btn-success btn-lg w-100" id="analyze-btn" disabled>
+                            <i class="fas fa-play me-2"></i>
+                            <span>Analyze</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Upload Progress -->
+            <div class="upload-progress-section mt-4" id="upload-progress-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <span id="progress-status">Uploading...</span>
+                    </span>
+                    <span class="text-muted" id="progress-percent">0%</span>
+                </div>
+                <div class="progress" style="height: 12px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                         id="upload-progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick SNP Lookup Card -->
+    <div class="vep-card mb-4" data-aos="fade-up" data-aos-delay="100">
+        <div class="vep-card-header">
+            <h6 class="mb-0">
+                <i class="fas fa-search me-2"></i>Quick SNP Lookup
+            </h6>
+        </div>
+        <div class="vep-card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-9">
+                    <input type="text" class="form-control form-control-lg" id="quick-rsid" 
+                           placeholder="Enter rsID (e.g., rs4040617)">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary btn-lg w-100" id="quick-lookup-btn">
+                        <i class="fas fa-bolt me-2"></i>Lookup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" style="display: none;">
+        <!-- Summary Cards -->
+        <div class="row g-3 mb-4" id="summary-cards">
+            <div class="col-6 col-md-3">
+                <div class="impact-card impact-high">
+                    <div class="impact-count" id="high-count">0</div>
+                    <div class="impact-label">HIGH Impact</div>
+                    <div class="impact-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="impact-card impact-moderate">
+                    <div class="impact-count" id="moderate-count">0</div>
+                    <div class="impact-label">MODERATE Impact</div>
+                    <div class="impact-icon"><i class="fas fa-exclamation-circle"></i></div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="impact-card impact-low">
+                    <div class="impact-count" id="low-count">0</div>
+                    <div class="impact-label">LOW Impact</div>
+                    <div class="impact-icon"><i class="fas fa-info-circle"></i></div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="impact-card impact-modifier">
+                    <div class="impact-count" id="modifier-count">0</div>
+                    <div class="impact-label">MODIFIER</div>
+                    <div class="impact-icon"><i class="fas fa-minus-circle"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Overview -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="vep-card h-100">
+                    <div class="vep-card-header">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Consequence Distribution</h5>
+                    </div>
+                    <div class="vep-card-body">
+                        <canvas id="consequence-chart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="vep-card h-100">
+                    <div class="vep-card-header">
+                        <h5 class="mb-0"><i class="fas fa-dna me-2"></i>Genes Affected</h5>
+                    </div>
+                    <div class="vep-card-body" id="genes-list" style="max-height: 300px; overflow-y: auto;">
+                        <!-- Genes loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pathogenic Variants -->
+        <div class="vep-card mb-4" id="pathogenic-section" style="display: none;">
+            <div class="vep-card-header bg-danger-subtle">
+                <h5 class="mb-0 text-danger"><i class="fas fa-biohazard me-2"></i>Potentially Pathogenic Variants (CADD ≥ 20)</h5>
+            </div>
+            <div class="vep-card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="pathogenic-table">
+                        <thead>
+                            <tr>
+                                <th>rsID</th>
+                                <th>Gene</th>
+                                <th>Impact</th>
+                                <th>Consequence</th>
+                                <th>CADD</th>
+                                <th>Protein Change</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pathogenic-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Variants Table -->
+        <div class="vep-card">
+            <div class="vep-card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Annotated Variants</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-2" id="export-json-btn">
+                        <i class="fas fa-download me-1"></i>JSON
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" id="export-csv-btn">
+                        <i class="fas fa-file-csv me-1"></i>CSV
+                    </button>
+                </div>
+            </div>
+            <div class="vep-card-body">
+                <!-- Filters -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="filter-search" placeholder="Search rsID, gene...">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="filter-impact">
+                            <option value="">All Impacts</option>
+                            <option value="HIGH">HIGH</option>
+                            <option value="MODERATE">MODERATE</option>
+                            <option value="LOW">LOW</option>
+                            <option value="MODIFIER">MODIFIER</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="filter-gene">
+                            <option value="">All Genes</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-secondary w-100" id="clear-filters-btn">Clear</button>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover" id="variants-table">
+                        <thead>
+                            <tr>
+                                <th>rsID</th>
+                                <th>Gene</th>
+                                <th>Impact</th>
+                                <th>Consequence</th>
+                                <th>CADD</th>
+                                <th>SIFT</th>
+                                <th>PolyPhen</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="variants-tbody">
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="text-center text-muted py-3" id="no-results-msg" style="display: none;">
+                    No variants match your filters.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="text-center py-5" id="loading-state" style="display: none;">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h5>Analyzing Variants...</h5>
+        <p class="text-muted">This may take a moment. Querying Ensembl VEP API...</p>
+        <div class="progress mx-auto" style="max-width: 300px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" id="progress-bar" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div class="alert alert-danger" id="error-state" style="display: none;">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <span id="error-message">An error occurred.</span>
+    </div>
+</div>
+
+<!-- SNP Detail Modal -->
+<div class="modal fade" id="vepModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-dna me-2"></i><span id="modal-rsid">Variant Details</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-outline-primary" id="ensembl-link" target="_blank">
+                    <i class="fas fa-external-link-alt me-2"></i>View on Ensembl
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .text-gradient-light {
+        background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .stat-mini-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1.25rem;
+        text-align: center;
+    }
+    
+    .stat-mini-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-mini-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .stat-mini-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    
+    .vep-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--glass-border);
+        overflow: hidden;
+    }
+    
+    .vep-card-header {
+        padding: 1rem 1.5rem;
+        background: rgba(99, 102, 241, 0.05);
+        border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .vep-card-body {
+        padding: 1.5rem;
+    }
+    
+    .impact-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: 1.25rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .impact-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+    }
+    
+    .impact-high::before { background: #ef4444; }
+    .impact-moderate::before { background: #f59e0b; }
+    .impact-low::before { background: #10b981; }
+    .impact-modifier::before { background: #6b7280; }
+    
+    .impact-count {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    
+    .impact-high .impact-count { color: #ef4444; }
+    .impact-moderate .impact-count { color: #f59e0b; }
+    .impact-low .impact-count { color: #10b981; }
+    .impact-modifier .impact-count { color: #6b7280; }
+    
+    .impact-label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+    
+    .impact-icon {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 2rem;
+        opacity: 0.1;
+    }
+    
+    .impact-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .impact-badge.high { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .impact-badge.moderate { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .impact-badge.low { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .impact-badge.modifier { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+    
+    .gene-chip {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary);
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin: 0.25rem;
+        transition: all 0.2s ease;
+    }
+    
+    .gene-chip:hover {
+        background: var(--primary);
+        color: white;
+        cursor: pointer;
+    }
+    
+    .cadd-score {
+        font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .cadd-score.high { color: #ef4444; }
+    .cadd-score.medium { color: #f59e0b; }
+    .cadd-score.low { color: #10b981; }
+    
+    .sift-badge, .polyphen-badge {
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .sift-badge.deleterious { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .sift-badge.tolerated { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    
+    .polyphen-badge.damaging { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .polyphen-badge.possibly { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .polyphen-badge.benign { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    
+    .table {
+        color: var(--text-primary);
+    }
+    
+    .table thead th {
+        background: rgba(99, 102, 241, 0.05);
+        border-color: var(--glass-border);
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .table td {
+        border-color: var(--glass-border);
+        vertical-align: middle;
+    }
+    
+    .table-hover tbody tr:hover {
+        background: rgba(99, 102, 241, 0.05);
+    }
+    
+    .rsid-link {
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    
+    .rsid-link:hover {
+        text-decoration: underline;
+    }
+    
+    .modal-content {
+        background: var(--bg-primary);
+        border: 1px solid var(--glass-border);
+    }
+    
+    .modal-header {
+        border-bottom-color: var(--glass-border);
+        background: rgba(99, 102, 241, 0.05);
+    }
+    
+    .modal-footer {
+        border-top-color: var(--glass-border);
+    }
+    
+    .btn-close-white {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
+    
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px dashed var(--glass-border);
+    }
+    
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+    
+    .detail-value {
+        font-weight: 600;
+    }
+    
+    .bg-danger-subtle {
+        background: rgba(239, 68, 68, 0.1) !important;
+    }
+    
+    /* Upload Zone Styles (matching upload.html) */
+    .upload-zone {
+        border: 2px dashed var(--glass-border);
+        border-radius: var(--radius-lg);
+        padding: 3rem 2rem;
+        text-align: center;
+        background: rgba(99, 102, 241, 0.02);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        min-height: 280px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+        border-color: var(--primary);
+        background: rgba(99, 102, 241, 0.05);
+        transform: translateY(-2px);
+    }
+    
+    .upload-icon-circle {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(99, 102, 241, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .upload-icon-circle i {
+        font-size: 1.5rem;
+        color: var(--primary);
+    }
+    
+    .format-badge {
+        padding: 0.5rem 1rem;
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: var(--radius-full);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--primary);
+        display: inline-block;
+    }
+    
+    /* File Preview Area */
+    .file-preview-area {
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .file-info-display {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        border-radius: var(--radius-lg);
+    }
+    
+    .file-icon-display {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        background: rgba(16, 185, 129, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+    
+    .file-icon-display i {
+        font-size: 1.5rem;
+        color: #10b981;
+    }
+    
+    .file-details-display {
+        flex: 1;
+    }
+    
+    .file-name-display {
+        margin: 0;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .file-size-display {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    
+    .btn-remove-file {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    
+    .btn-remove-file:hover {
+        background: #ef4444;
+        color: white;
+        transform: scale(1.1);
+    }
+    
+    /* Analysis Settings */
+    .analysis-settings {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(118, 75, 162, 0.05));
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border: 1px solid var(--glass-border);
+    }
+    
+    .analysis-settings .form-control-lg {
+        font-size: 1.5rem;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    /* Upload Progress Section */
+    .upload-progress-section {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.1));
+        padding: 1.5rem;
+        border-radius: var(--radius-lg);
+        border: 2px solid rgba(34, 197, 94, 0.3);
+    }
+    
+    .upload-progress-section .progress {
+        height: 12px;
+        background: rgba(34, 197, 94, 0.2);
+        border-radius: 10px;
+    }
+    
+    /* Responsive */
+    @media (max-width: 992px) {
+        .analysis-settings {
+            margin-top: 2rem;
+        }
+        .dropzone-icon {
+            font-size: 3rem;
+        }
+    }
+</style>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let analysisData = null;
+    let consequenceChart = null;
+    
+    // Elements
+    const dropZone = document.getElementById('upload-dropzone');
+    const fileInput = document.getElementById('file-upload');
+    const browseBtn = document.getElementById('browse-btn');
+    const dropzonePlaceholder = document.getElementById('dropzone-placeholder');
+    const dropzoneSelected = document.getElementById('dropzone-selected');
+    const selectedFilename = document.getElementById('selected-filename');
+    const selectedFilesize = document.getElementById('selected-filesize');
+    const removeFileBtn = document.getElementById('remove-file-btn');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const snpLimitInput = document.getElementById('snp-limit');
+    
+    // Click to browse
+    browseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.click();
+    });
+    
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    // Drag & drop handlers
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        });
+    });
+    
+    // Drop handler
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            handleFile(files[0]);
+        }
+    });
+    
+    // File input change
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) {
+            handleFile(fileInput.files[0]);
+        }
+    });
+    
+    // Handle file selection
+    function handleFile(file) {
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        if (fileExt !== 'csv' && fileExt !== 'ped') {
+            alert('Please upload a CSV or PED file');
+            return;
+        }
+        
+        selectedFilename.textContent = file.name;
+        selectedFilesize.textContent = formatFileSize(file.size);
+        
+        // Update icon based on file type
+        const fileIcon = dropzoneSelected.querySelector('.file-icon-display i');
+        if (fileExt === 'ped') {
+            fileIcon.className = 'fas fa-file-alt';
+        } else {
+            fileIcon.className = 'fas fa-file-csv';
+        }
+        
+        dropzonePlaceholder.style.display = 'none';
+        dropzoneSelected.style.display = 'block';
+        analyzeBtn.disabled = false;
+        
+        // Set file to input
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+    }
+    
+    // Remove file
+    removeFileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.value = '';
+        dropzonePlaceholder.style.display = 'block';
+        dropzoneSelected.style.display = 'none';
+        analyzeBtn.disabled = true;
+    });
+    
+    // Format file size
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    
+    // Analyze button
+    analyzeBtn.addEventListener('click', uploadAndAnalyze);
+    
+    // Quick lookup
+    document.getElementById('quick-lookup-btn').addEventListener('click', quickLookup);
+    document.getElementById('quick-rsid').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') quickLookup();
+    });
+    
+    function uploadAndAnalyze() {
+        const fileInput = document.getElementById('file-upload');
+        const limit = parseInt(document.getElementById('snp-limit').value);
+        
+        if (!fileInput.files || !fileInput.files[0]) {
+            alert('Please select a CSV or PED file to upload');
+            return;
+        }
+        
+        if (!limit || limit < 1) {
+            alert('Please enter a valid SNP limit (minimum 1)');
+            return;
+        }
+        
+        if (limit > 1000) {
+            if (!confirm(`Analyzing ${limit} SNPs will take a long time. Continue?`)) {
+                return;
+            }
+        }
+        
+        const file = fileInput.files[0];
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        
+        // Validate file type
+        if (fileExt !== 'csv' && fileExt !== 'ped') {
+            alert('Please upload a CSV or PED file');
+            return;
+        }
+        
+        // Show upload progress
+        const progressSection = document.getElementById('upload-progress-section');
+        const progressBar = document.getElementById('upload-progress-bar');
+        const progressStatus = document.getElementById('progress-status');
+        const progressPercent = document.getElementById('progress-percent');
+        
+        progressSection.style.display = 'block';
+        progressStatus.textContent = 'Uploading file...';
+        analyzeBtn.disabled = true;
+        
+        // Animate progress
+        let progress = 0;
+        const uploadInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) {
+                clearInterval(uploadInterval);
+                progress = 90;
+            }
+            progressBar.style.width = progress + '%';
+            progressPercent.textContent = Math.round(progress) + '%';
+        }, 200);
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Upload file first
+        fetch('/api/upload_sample', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            clearInterval(uploadInterval);
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            
+            if (data.success) {
+                // File uploaded successfully
+                const uploadedFileName = data.filename;
+                progressStatus.textContent = fileExt === 'ped' ? 'PED file converted! Starting analysis...' : 'File uploaded! Starting analysis...';
+                
+                // Hide upload progress after delay and start analysis
+                setTimeout(() => {
+                    progressSection.style.display = 'none';
+                    progressBar.style.width = '0%';
+                    analyzeBtn.disabled = false;
+                    
+                    // Run VEP analysis on uploaded file
+                    analyzeUploadedFile(uploadedFileName, limit);
+                }, 1000);
+            } else {
+                clearInterval(uploadInterval);
+                progressSection.style.display = 'none';
+                analyzeBtn.disabled = false;
+                showError(data.error || 'Upload failed');
+            }
+        })
+        .catch(err => {
+            clearInterval(uploadInterval);
+            progressSection.style.display = 'none';
+            analyzeBtn.disabled = false;
+            showError('Upload error: ' + err.message);
+        });
+    }
+    
+    function analyzeUploadedFile(fileName, limit) {
+        // Show loading
+        document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('results-section').style.display = 'none';
+        document.getElementById('error-state').style.display = 'none';
+        
+        // Animate progress bar
+        let progress = 0;
+        const progressBar = document.getElementById('progress-bar');
+        const progressInterval = setInterval(() => {
+            progress = Math.min(progress + Math.random() * 10, 90);
+            progressBar.style.width = progress + '%';
+        }, 500);
+        
+        fetch('/api/vep/analyze-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                file_path: `uploads/${fileName}`,
+                limit: limit
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            
+            document.getElementById('loading-state').style.display = 'none';
+            
+            if (data.success) {
+                analysisData = data;
+                displayResults(data);
+            } else {
+                showError(data.error || 'Analysis failed');
+            }
+        })
+        .catch(err => {
+            clearInterval(progressInterval);
+            document.getElementById('loading-state').style.display = 'none';
+            showError(err.message);
+        });
+    }
+    
+    function quickLookup() {
+        const rsId = document.getElementById('quick-rsid').value.trim();
+        if (!rsId) {
+            alert('Please enter an rsID');
+            return;
+        }
+        
+        document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('results-section').style.display = 'none';
+        document.getElementById('error-state').style.display = 'none';
+        
+        fetch('/api/vep/analyze-snp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rs_id: rsId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('loading-state').style.display = 'none';
+            
+            if (data.success) {
+                showVariantDetail(data.data);
+            } else {
+                showError(data.error || 'Lookup failed');
+            }
+        })
+        .catch(err => {
+            document.getElementById('loading-state').style.display = 'none';
+            showError(err.message);
+        });
+    }
+    
+    function displayResults(data) {
+        document.getElementById('results-section').style.display = 'block';
+        
+        // Setup filters and export buttons
+        document.getElementById('filter-search').addEventListener('input', filterVariants);
+        document.getElementById('filter-impact').addEventListener('change', filterVariants);
+        document.getElementById('filter-gene').addEventListener('change', filterVariants);
+        document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
+        document.getElementById('export-json-btn').addEventListener('click', exportJSON);
+        document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
+        
+        // Impact counts
+        const impacts = data.impact_distribution || {};
+        document.getElementById('high-count').textContent = impacts.HIGH || 0;
+        document.getElementById('moderate-count').textContent = impacts.MODERATE || 0;
+        document.getElementById('low-count').textContent = impacts.LOW || 0;
+        document.getElementById('modifier-count').textContent = impacts.MODIFIER || 0;
+        
+        // Consequence chart
+        renderConsequenceChart(data.top_consequences || {});
+        
+        // Genes list
+        renderGenesList(data.genes_affected || []);
+        
+        // Pathogenic variants
+        renderPathogenicVariants(data.pathogenic_variants || []);
+        
+        // All variants table
+        renderVariantsTable(data.variants || []);
+        
+        // Populate gene filter
+        populateGeneFilter(data.genes_affected || []);
+    }
+    
+    function renderConsequenceChart(consequences) {
+        const ctx = document.getElementById('consequence-chart').getContext('2d');
+        
+        if (consequenceChart) {
+            consequenceChart.destroy();
+        }
+        
+        const labels = Object.keys(consequences).map(c => c.replace(/_/g, ' '));
+        const values = Object.values(consequences);
+        
+        const colors = [
+            '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', 
+            '#ec4899', '#f43f5e', '#f97316', '#eab308',
+            '#84cc16', '#22c55e'
+        ];
+        
+        consequenceChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#94a3b8',
+                            font: { size: 11 },
+                            boxWidth: 15,
+                            padding: 10
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function renderGenesList(genes) {
+        const container = document.getElementById('genes-list');
+        
+        if (genes.length === 0) {
+            container.innerHTML = '<p class="text-muted">No genes affected</p>';
+            return;
+        }
+        
+        container.innerHTML = genes.map(gene => 
+            `<span class="gene-chip" onclick="filterByGene('${gene}')">${gene}</span>`
+        ).join('');
+    }
+    
+    function renderPathogenicVariants(variants) {
+        const section = document.getElementById('pathogenic-section');
+        const tbody = document.getElementById('pathogenic-tbody');
+        
+        if (variants.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        
+        section.style.display = 'block';
+        tbody.innerHTML = variants.map(v => `
+            <tr onclick="showVariantDetail(${JSON.stringify(v).replace(/"/g, '&quot;')})">
+                <td><a class="rsid-link" href="#">${v.rs_id}</a></td>
+                <td>${v.gene_symbol || '-'}</td>
+                <td><span class="impact-badge ${(v.impact || '').toLowerCase()}">${v.impact || '-'}</span></td>
+                <td>${formatConsequence(v.most_severe_consequence)}</td>
+                <td><span class="cadd-score ${getCaddClass(v.cadd_score)}">${v.cadd_score ? v.cadd_score.toFixed(1) : '-'}</span></td>
+                <td><code>${v.protein_change || '-'}</code></td>
+            </tr>
+        `).join('');
+    }
+    
+    function renderVariantsTable(variants) {
+        const tbody = document.getElementById('variants-tbody');
+        
+        if (variants.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No variants to display</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = variants.map(v => `
+            <tr data-rsid="${v.rs_id}" data-gene="${v.gene_symbol || ''}" data-impact="${v.impact || ''}">
+                <td><a class="rsid-link" href="#" onclick="showVariantDetail(${JSON.stringify(v).replace(/"/g, '&quot;')}); return false;">${v.rs_id}</a></td>
+                <td>${v.gene_symbol || '-'}</td>
+                <td><span class="impact-badge ${(v.impact || '').toLowerCase()}">${v.impact || '-'}</span></td>
+                <td>${formatConsequence(v.most_severe_consequence)}</td>
+                <td><span class="cadd-score ${getCaddClass(v.cadd_score)}">${v.cadd_score ? v.cadd_score.toFixed(1) : '-'}</span></td>
+                <td>${getSiftBadge(v.sift_prediction, v.sift_score)}</td>
+                <td>${getPolyphenBadge(v.polyphen_prediction, v.polyphen_score)}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="showVariantDetail(${JSON.stringify(v).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    function populateGeneFilter(genes) {
+        const select = document.getElementById('filter-gene');
+        select.innerHTML = '<option value="">All Genes</option>';
+        genes.forEach(gene => {
+            const option = document.createElement('option');
+            option.value = gene;
+            option.textContent = gene;
+            select.appendChild(option);
+        });
+    }
+    
+    function filterVariants() {
+        const search = document.getElementById('filter-search').value.toLowerCase();
+        const impact = document.getElementById('filter-impact').value;
+        const gene = document.getElementById('filter-gene').value;
+        
+        const rows = document.querySelectorAll('#variants-tbody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const rsid = row.dataset.rsid?.toLowerCase() || '';
+            const rowGene = row.dataset.gene?.toLowerCase() || '';
+            const rowImpact = row.dataset.impact || '';
+            
+            const matchSearch = !search || rsid.includes(search) || rowGene.includes(search);
+            const matchImpact = !impact || rowImpact === impact;
+            const matchGene = !gene || rowGene.toLowerCase() === gene.toLowerCase();
+            
+            if (matchSearch && matchImpact && matchGene) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('no-results-msg').style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+    
+    window.filterByGene = function(gene) {
+        document.getElementById('filter-gene').value = gene;
+        filterVariants();
+    };
+    
+    function clearFilters() {
+        document.getElementById('filter-search').value = '';
+        document.getElementById('filter-impact').value = '';
+        document.getElementById('filter-gene').value = '';
+        filterVariants();
+    }
+    
+    window.showVariantDetail = function(variant) {
+        const modal = new bootstrap.Modal(document.getElementById('vepModal'));
+        document.getElementById('modal-rsid').textContent = variant.rs_id;
+        document.getElementById('ensembl-link').href = `https://www.ensembl.org/Homo_sapiens/Variation/Explore?v=${variant.rs_id}`;
+        
+        document.getElementById('modal-body').innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-primary mb-3"><i class="fas fa-info-circle me-2"></i>Basic Information</h6>
+                    <div class="detail-row">
+                        <span class="detail-label">rsID</span>
+                        <span class="detail-value">${variant.rs_id}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Gene</span>
+                        <span class="detail-value">${variant.gene_symbol || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Transcript</span>
+                        <span class="detail-value">${variant.transcript_id || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Biotype</span>
+                        <span class="detail-value">${variant.biotype || 'N/A'}</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-primary mb-3"><i class="fas fa-exclamation-triangle me-2"></i>Impact Assessment</h6>
+                    <div class="detail-row">
+                        <span class="detail-label">Impact</span>
+                        <span class="impact-badge ${(variant.impact || '').toLowerCase()}">${variant.impact || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Consequence</span>
+                        <span class="detail-value">${formatConsequence(variant.most_severe_consequence)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Protein Change</span>
+                        <code>${variant.protein_change || 'N/A'}</code>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Amino Acids</span>
+                        <span class="detail-value">${variant.amino_acids || 'N/A'}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-4">
+            
+            <h6 class="text-primary mb-3"><i class="fas fa-chart-bar me-2"></i>Pathogenicity Scores</h6>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="text-center p-3 rounded" style="background: rgba(99, 102, 241, 0.1);">
+                        <div class="cadd-score ${getCaddClass(variant.cadd_score)}" style="font-size: 2rem;">
+                            ${variant.cadd_score ? variant.cadd_score.toFixed(2) : 'N/A'}
+                        </div>
+                        <div class="text-muted">CADD Score</div>
+                        ${variant.cadd_score ? `<small class="text-muted">${variant.cadd_score >= 20 ? 'Likely pathogenic' : variant.cadd_score >= 15 ? 'Possibly pathogenic' : 'Likely benign'}</small>` : ''}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-3 rounded" style="background: rgba(99, 102, 241, 0.1);">
+                        <div class="mb-2">${getSiftBadge(variant.sift_prediction, variant.sift_score)}</div>
+                        <div class="text-muted">SIFT</div>
+                        ${variant.sift_score !== null ? `<small class="text-muted">Score: ${variant.sift_score?.toFixed(3) || 'N/A'}</small>` : ''}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-3 rounded" style="background: rgba(99, 102, 241, 0.1);">
+                        <div class="mb-2">${getPolyphenBadge(variant.polyphen_prediction, variant.polyphen_score)}</div>
+                        <div class="text-muted">PolyPhen</div>
+                        ${variant.polyphen_score !== null ? `<small class="text-muted">Score: ${variant.polyphen_score?.toFixed(3) || 'N/A'}</small>` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            ${variant.clinical_significance && variant.clinical_significance.length > 0 ? `
+                <hr class="my-4">
+                <h6 class="text-primary mb-3"><i class="fas fa-hospital me-2"></i>Clinical Significance</h6>
+                <div>
+                    ${variant.clinical_significance.map(sig => `<span class="badge bg-secondary me-1">${sig}</span>`).join('')}
+                </div>
+            ` : ''}
+            
+            ${variant.consequences && variant.consequences.length > 0 ? `
+                <hr class="my-4">
+                <h6 class="text-primary mb-3"><i class="fas fa-list me-2"></i>All Consequences</h6>
+                <div>
+                    ${variant.consequences.map(c => `<span class="badge bg-primary me-1">${formatConsequence(c)}</span>`).join('')}
+                </div>
+            ` : ''}
+        `;
+        
+        modal.show();
+    };
+    
+    function formatConsequence(consequence) {
+        if (!consequence) return '-';
+        return consequence.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
+    function getCaddClass(score) {
+        if (!score) return '';
+        if (score >= 20) return 'high';
+        if (score >= 15) return 'medium';
+        return 'low';
+    }
+    
+    function getSiftBadge(prediction, score) {
+        if (!prediction) return '<span class="text-muted">-</span>';
+        const cls = prediction.toLowerCase().includes('deleterious') ? 'deleterious' : 'tolerated';
+        return `<span class="sift-badge ${cls}">${prediction}</span>`;
+    }
+    
+    function getPolyphenBadge(prediction, score) {
+        if (!prediction) return '<span class="text-muted">-</span>';
+        let cls = 'benign';
+        if (prediction.toLowerCase().includes('damaging')) cls = 'damaging';
+        else if (prediction.toLowerCase().includes('possibly')) cls = 'possibly';
+        return `<span class="polyphen-badge ${cls}">${prediction}</span>`;
+    }
+    
+    function showError(message) {
+        document.getElementById('error-state').style.display = 'block';
+        // Support multi-line error messages
+        document.getElementById('error-message').innerHTML = message.replace(/\n/g, '<br>');
+    }
+    
+    function exportJSON() {
+        if (!analysisData) return;
+        const blob = new Blob([JSON.stringify(analysisData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `vep_analysis_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+    }
+    
+    function exportCSV() {
+        if (!analysisData || !analysisData.variants) return;
+        
+        const headers = ['rsID', 'Gene', 'Impact', 'Consequence', 'CADD', 'SIFT', 'PolyPhen', 'Protein Change'];
+        const rows = analysisData.variants.map(v => [
+            v.rs_id,
+            v.gene_symbol || '',
+            v.impact || '',
+            v.most_severe_consequence || '',
+            v.cadd_score || '',
+            v.sift_prediction || '',
+            v.polyphen_prediction || '',
+            v.protein_change || ''
+        ]);
+        
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `vep_analysis_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+    }
+    
+    {% if analysis_result %}
+    // Auto-display results if we have them
+    analysisData = {{ analysis_result | tojson | safe }};
+    displayResults(analysisData);
+    {% endif %}
+});
+</script>
+{% endblock %}
+

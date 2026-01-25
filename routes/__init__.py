@@ -31,6 +31,7 @@ from .snp_database_routes import snp_database_bp
 from .risk_calculator_routes import risk_calculator_bp
 from .notifications_routes import notifications_bp
 from .pages_routes import pages_bp  # Static pages (Privacy, Terms, Contact)
+from .vep_routes import vep_bp, vep_page_bp  # VEP Analysis routes
 
 
 def register_blueprints(app):
@@ -54,5 +55,7 @@ def register_blueprints(app):
     app.register_blueprint(risk_calculator_bp)  # Risk Calculator routes
     app.register_blueprint(notifications_bp)  # Notifications routes
     app.register_blueprint(pages_bp)  # Static pages (Privacy, Terms, Contact)
+    app.register_blueprint(vep_bp)  # VEP API routes
+    app.register_blueprint(vep_page_bp)  # VEP page routes
 
 

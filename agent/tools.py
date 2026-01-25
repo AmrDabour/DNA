@@ -476,6 +476,115 @@ def generate_genetic_summary_card(sample_file: str) -> Dict[str, Any]:
 
 
 # ============================================================
+# VEP (Variant Effect Predictor) Tools
+# ============================================================
+
+class VEPAnalysisInput(BaseModel):
+    """Input schema for VEP analysis"""
+    sample_file: str = Field(description="Path to the sample CSV file")
+    limit: int = Field(default=50, description="Maximum number of SNPs to analyze (default 50)")
+
+
+class VEPSingleSNPInput(BaseModel):
+    """Input schema for single SNP VEP analysis"""
+    rs_id: str = Field(description="The SNP rsID to analyze (e.g., rs4040617)")
+
+
+@tool(args_schema=VEPAnalysisInput)
+def analyze_snp_effects(sample_file: str, limit: int = 50) -> Dict[str, Any]:
+    """
+    Analyze the biological effects of SNPs using Ensembl VEP (Variant Effect Predictor).
+    Returns detailed gene impact predictions, pathogenicity scores, and functional annotations.
+    Use this when user wants to understand what their SNPs do or their biological significance.
+    
+    Args:
+        sample_file: Path to the sample CSV file
+        limit: Maximum number of SNPs to analyze (default 50)
+        
+    Returns:
+        dict: VEP analysis results including impact distribution, affected genes, 
+              pathogenic variants, and detailed annotations
+    """
+    # Normalize path - handle both forward and back slashes
+    normalized_path = sample_file.replace("\\", "/")
+    
+    # Remove "uploads/" prefix if already present to avoid duplication
+    if normalized_path.startswith("uploads/"):
+        file_path = normalized_path
+    else:
+        file_path = f"uploads/{normalized_path}"
+    
+    return call_api("/api/vep/analyze-file", "POST", {
+        "file_path": file_path,
+        "limit": limit
+    })
+
+
+@tool(args_schema=VEPSingleSNPInput)
+def get_variant_pathogenicity(rs_id: str) -> Dict[str, Any]:
+    """
+    Get detailed pathogenicity information for a specific SNP variant.
+    Returns CADD score, SIFT/PolyPhen predictions, clinical significance, and gene impact.
+    Use this when user asks about a specific SNP's disease relevance or pathogenicity.
+    
+    Args:
+        rs_id: The SNP rsID to analyze (e.g., rs4040617, rs1800497)
+        
+    Returns:
+        dict: Pathogenicity predictions including CADD score, SIFT, PolyPhen, 
+              clinical significance, and affected gene information
+    """
+    return call_api("/api/vep/analyze-snp", "POST", {"rs_id": rs_id})
+
+
+@tool(args_schema=SampleFileInput)
+def get_population_frequencies_vep(sample_file: str) -> Dict[str, Any]:
+    """
+    Get population allele frequencies for SNPs in a sample file.
+    Compares patient alleles to reference population frequencies from gnomAD/1000 Genomes.
+    Use this when user wants to know how common their variants are in different populations.
+    
+    Args:
+        sample_file: Path to the sample CSV file
+        
+    Returns:
+        dict: Population frequency data showing how common each variant is across populations
+    """
+    result = call_api("/api/vep/analyze-file", "POST", {
+        "file_path": f"uploads/{sample_file}" if not sample_file.startswith("uploads/") else sample_file,
+        "limit": 100
+    })
+    
+    # Extract and summarize population frequencies
+    if result.get("success") and "variants" in result:
+        freq_summary = []
+        for variant in result["variants"][:20]:  # Top 20 for summary
+            if variant.get("population_frequencies"):
+                freq_summary.append({
+                    "rs_id": variant.get("rs_id"),
+                    "gene": variant.get("gene_symbol"),
+                    "frequencies": variant.get("population_frequencies")
+                })
+        
+        result["frequency_summary"] = freq_summary
+        result["frequency_summary_count"] = len(freq_summary)
+    
+    return result
+
+
+@tool
+def get_vep_service_status() -> Dict[str, Any]:
+    """
+    Check if VEP (Variant Effect Predictor) service is available and working.
+    Use this to verify VEP functionality before running analyses.
+    
+    Returns:
+        dict: VEP service status including API availability and cache statistics
+    """
+    return call_api("/api/vep/status", "GET")
+
+
+# ============================================================
 # Tool Collection
 # ============================================================
 
@@ -509,6 +618,11 @@ def get_all_tools():
         calculate_genetic_relatedness,
         get_trait_predictions_guide,
         generate_genetic_summary_card,
+        # VEP (Variant Effect Predictor) Tools
+        analyze_snp_effects,
+        get_variant_pathogenicity,
+        get_population_frequencies_vep,
+        get_vep_service_status,
     ]
 
 

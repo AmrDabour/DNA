@@ -25,7 +25,7 @@ class Config:
     # File paths
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
     PATIENT_DATA_DIR = os.getenv("PATIENT_DATA_DIR", "./patient_snp_data")
-    gender_model_dir = os.getenv("gender_model_dir", "./hapmap_data/gender_prediction_data")
+    gender_model_dir = os.getenv("gender_model_dir", "./ml_models/gender_prediction_package")
     ANCESTRY_MODEL_DIR = os.getenv("ANCESTRY_MODEL_DIR", "./hapmap_data/Model_region")
     
     # Agent settings

@@ -1262,7 +1262,7 @@ def predict():
     """Handle sample prediction requests from the samples page"""
     try:
         # Import predictors lazily to avoid circular imports
-        from models import GeneticPredictor, POPULATION_INFO as POP_INFO, find_model_directories
+        from ml_models import GeneticPredictor, POPULATION_INFO as POP_INFO, find_model_directories
         
         sample_id = request.form.get("sample_id")
         if not sample_id:

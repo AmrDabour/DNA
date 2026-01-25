@@ -30,6 +30,13 @@ class Config:
     ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@genovaai.com')
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
     
+    # VEP (Variant Effect Predictor) Configuration
+    VEP_ENABLED = os.environ.get('VEP_ENABLED', 'true').lower() == 'true'
+    VEP_CACHE_TTL = int(os.environ.get('VEP_CACHE_TTL', 7))  # Cache TTL in days
+    VEP_BATCH_SIZE = int(os.environ.get('VEP_BATCH_SIZE', 200))  # Max SNPs per API request
+    VEP_RATE_LIMIT = float(os.environ.get('VEP_RATE_LIMIT', 15))  # Requests per second
+    VEP_BASE_URL = os.environ.get('VEP_BASE_URL', 'https://rest.ensembl.org')
+    
     @staticmethod
     def init_app(app):
         """Initialize application with this config"""

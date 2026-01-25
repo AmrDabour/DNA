@@ -14,6 +14,7 @@ import shutil
 import pandas as pd
 from werkzeug.utils import secure_filename
 from database.models import db, AnalysisHistory
+from routes.notifications_routes import notify_user
 
 # Create blueprint with no prefix for page routes
 upload_bp = Blueprint('upload', __name__)
@@ -46,7 +47,26 @@ def convert_ped_to_csv(ped_file_path, map_file_path=None):
     Returns:
         Path to the converted CSV file
     """
-    print(f"Converting PED file: {ped_file_path}")
+    print(f"Processing file: {ped_file_path}")
+    
+    # First, check if this is actually a CSV file with .ped extension
+    try:
+        # Try reading as CSV first
+        test_df = pd.read_csv(ped_file_path, nrows=5)
+        # If it has typical CSV columns like SNP, CHR, etc., it's actually a CSV
+        csv_columns = {'SNP', 'CHR', 'POS', 'Allele1', 'Allele2', 'Patient_ID'}
+        if csv_columns.intersection(set(test_df.columns)):
+            print(f"File appears to be CSV format with .ped extension, copying as-is")
+            # Just rename to .csv
+            csv_file_path = ped_file_path.rsplit('.', 1)[0] + '.csv'
+            if ped_file_path != csv_file_path:
+                import shutil
+                shutil.copy2(ped_file_path, csv_file_path)
+            return csv_file_path
+    except Exception as e:
+        print(f"Not a CSV file, treating as PLINK PED format: {e}")
+    
+    print(f"Converting PLINK PED file: {ped_file_path}")
     
     # Try to find associated .map file if not provided
     if map_file_path is None:
@@ -442,12 +462,12 @@ def process_snp_file():
         patient_id = os.path.splitext(os.path.basename(file_path))[0]
         start_time = time.time()
 
-        # Use model packages from new_model directory (contains metadata.json and encoding_function.py)
+        # Use model packages from ml_models directory (contains metadata.json and encoding_function.py)
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        sex_package_dir = os.path.join(project_root, "new_model", "gender_prediction_package")
-        region_package_dir = os.path.join(project_root, "new_model", "region_prediction_package")
+        sex_package_dir = os.path.join(project_root, "ml_models", "gender_prediction_package")
+        region_package_dir = os.path.join(project_root, "ml_models", "region_prediction_package")
 
-        script_path = os.path.join(project_root, "new_model", "predict_patient.py")
+        script_path = os.path.join(project_root, "ml_models", "predict_patient.py")
         if not os.path.exists(script_path):
             return jsonify({"success": False, "error": "predict_patient.py script not found"})
 
@@ -475,6 +495,13 @@ def process_snp_file():
             stdout = process_result.stdout if hasattr(process_result, "stdout") else ""
             # stderr available but not used currently
         except subprocess.TimeoutExpired:
+            if current_user.is_authenticated:
+                notify_user(
+                    user_id=current_user.id,
+                    title="⏱️ Analysis Timeout",
+                    message="Analysis process timed out after 5 minutes. Please try with a smaller file.",
+                    notification_type="error"
+                )
             return jsonify({"success": False, "error": "Process timed out after 5 minutes"})
         except Exception as e:
             return jsonify({"success": False, "error": f"Error executing process: {str(e)}"})
@@ -532,6 +559,18 @@ def process_snp_file():
             except Exception as db_error:
                 print(f"Warning: Could not save to database: {db_error}")
             
+            # Send notification to user if authenticated
+            if user_id:
+                gender = extracted_results.get("gender_prediction", {}).get("predicted_sex", "Unknown")
+                ancestry = extracted_results.get("region_prediction", {}).get("prediction", {}).get("predicted_population", "Unknown")
+                notify_user(
+                    user_id=user_id,
+                    title="🧬 Analysis Complete",
+                    message=f"Sample {patient_id}: {gender}, {ancestry} ancestry. Processing took {processing_time:.1f}s",
+                    notification_type="success",
+                    data={"patient_id": patient_id, "result_file": final_result_file}
+                )
+            
             return jsonify({
                 "success": True,
                 "patient_id": patient_id,
@@ -562,6 +601,22 @@ def process_snp_file():
             except Exception as db_error:
                 print(f"Warning: Could not save to database: {db_error}")
 
+            # Send notification to user if authenticated
+            if user_id:
+                gender = result_data.get("sex_prediction", result_data.get("gender_prediction", {}))
+                if isinstance(gender, dict):
+                    gender = gender.get("predicted_sex", "Unknown")
+                ancestry = result_data.get("region_prediction", {}).get("prediction", {})
+                if isinstance(ancestry, dict):
+                    ancestry = ancestry.get("predicted_population", "Unknown")
+                notify_user(
+                    user_id=user_id,
+                    title="🧬 Analysis Complete",
+                    message=f"Sample {patient_id}: {gender}, {ancestry} ancestry. Processing took {processing_time:.1f}s",
+                    notification_type="success",
+                    data={"patient_id": patient_id, "result_file": final_result_file}
+                )
+
             return jsonify({
                 "success": True,
                 "patient_id": patient_id,
@@ -577,4 +632,13 @@ def process_snp_file():
 
     except Exception as e:
         import traceback
+        # Send error notification if user is authenticated
+        if current_user.is_authenticated:
+            notify_user(
+                user_id=current_user.id,
+                title="❌ Analysis Failed",
+                message=f"Error processing file: {str(e)[:100]}",
+                notification_type="error",
+                data={"error": str(e)}
+            )
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()})

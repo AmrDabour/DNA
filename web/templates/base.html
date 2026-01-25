@@ -108,6 +108,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/vep-analysis' %}active{% endif %}" href="/vep-analysis">
+                            <i class="fas fa-microscope"></i>
+                            <span>VEP Analysis</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.path == '/risk-calculator' %}active{% endif %}" href="/risk-calculator">
                             <i class="fas fa-calculator"></i>
                             <span>Risk Calculator</span>
@@ -714,11 +720,16 @@
                 .then(() => loadNotifications());
         }
         
-        // Load notifications when page loads
+        // Load notifications when page loads (only for authenticated users)
         document.addEventListener('DOMContentLoaded', function() {
-            loadNotifications();
-            // Poll for new notifications every 30 seconds
-            setInterval(loadNotifications, 30000);
+            // Check if user is authenticated by looking for the user dropdown
+            const isAuthenticated = document.querySelector('.dropdown-menu a[href*="logout"]') !== null;
+            
+            if (isAuthenticated) {
+                loadNotifications();
+                // Poll for new notifications every 2 minutes (only when authenticated)
+                setInterval(loadNotifications, 120000);
+            }
         });
     </script>
     

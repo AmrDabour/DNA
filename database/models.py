@@ -388,6 +388,110 @@ class GeneticRiskProfile(db.Model):
         return f'<GeneticRiskProfile {self.sample_id}>'
 
 
+class VEPAnnotation(db.Model):
+    """Model to cache VEP (Variant Effect Predictor) results"""
+    __tablename__ = 'vep_annotations'
+    
+    # Primary key is the rsID
+    rs_id = db.Column(db.String(20), primary_key=True, index=True)
+    
+    # Core VEP data
+    most_severe_consequence = db.Column(db.String(100))
+    impact = db.Column(db.String(20))  # HIGH, MODERATE, LOW, MODIFIER
+    gene_symbol = db.Column(db.String(50), index=True)
+    gene_id = db.Column(db.String(50))
+    transcript_id = db.Column(db.String(50))
+    biotype = db.Column(db.String(50))
+    
+    # Protein-level changes
+    protein_change = db.Column(db.String(100))  # HGVS protein notation
+    codon_change = db.Column(db.String(50))
+    amino_acids = db.Column(db.String(20))
+    
+    # Pathogenicity scores
+    cadd_phred = db.Column(db.Float)
+    cadd_raw = db.Column(db.Float)
+    sift_prediction = db.Column(db.String(50))
+    sift_score = db.Column(db.Float)
+    polyphen_prediction = db.Column(db.String(50))
+    polyphen_score = db.Column(db.Float)
+    
+    # Clinical significance
+    clinical_significance = db.Column(db.Text)  # JSON array
+    
+    # Population frequencies
+    population_frequencies = db.Column(db.Text)  # JSON object
+    
+    # All consequences
+    consequences = db.Column(db.Text)  # JSON array
+    
+    # Full API response for future reference
+    full_response = db.Column(db.Text)  # JSON
+    
+    # Cache metadata
+    cached_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, index=True)
+    
+    def get_population_frequencies(self):
+        """Get population frequencies as dictionary"""
+        if self.population_frequencies:
+            return json.loads(self.population_frequencies)
+        return {}
+    
+    def set_population_frequencies(self, freqs_dict):
+        """Set population frequencies from dictionary"""
+        self.population_frequencies = json.dumps(freqs_dict)
+    
+    def get_clinical_significance(self):
+        """Get clinical significance as list"""
+        if self.clinical_significance:
+            return json.loads(self.clinical_significance)
+        return []
+    
+    def set_clinical_significance(self, sig_list):
+        """Set clinical significance from list"""
+        self.clinical_significance = json.dumps(sig_list)
+    
+    def get_consequences(self):
+        """Get consequences as list"""
+        if self.consequences:
+            return json.loads(self.consequences)
+        return []
+    
+    def set_consequences(self, cons_list):
+        """Set consequences from list"""
+        self.consequences = json.dumps(cons_list)
+    
+    def to_dict(self):
+        """Convert VEP annotation to dictionary"""
+        return {
+            'rs_id': self.rs_id,
+            'most_severe_consequence': self.most_severe_consequence,
+            'impact': self.impact,
+            'gene_symbol': self.gene_symbol,
+            'gene_id': self.gene_id,
+            'transcript_id': self.transcript_id,
+            'biotype': self.biotype,
+            'protein_change': self.protein_change,
+            'codon_change': self.codon_change,
+            'amino_acids': self.amino_acids,
+            'cadd_score': self.cadd_phred,
+            'cadd_raw': self.cadd_raw,
+            'sift_prediction': self.sift_prediction,
+            'sift_score': self.sift_score,
+            'polyphen_prediction': self.polyphen_prediction,
+            'polyphen_score': self.polyphen_score,
+            'clinical_significance': self.get_clinical_significance(),
+            'population_frequencies': self.get_population_frequencies(),
+            'consequences': self.get_consequences(),
+            'cached_at': self.cached_at.isoformat() if self.cached_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+        }
+    
+    def __repr__(self):
+        return f'<VEPAnnotation {self.rs_id}>'
+
+
 def init_db(app):
     """Initialize database with Flask app"""
     db.init_app(app)

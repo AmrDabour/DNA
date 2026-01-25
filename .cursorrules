@@ -1,0 +1,392 @@
+# 🧬 GenovaAI - Genetic Prediction System
+
+## 📋 Project Overview
+
+**GenovaAI** is a Flask-based web application for genetic predictions using machine learning models. The system predicts gender and ancestry based on SNP (Single Nucleotide Polymorphism) data and uses Google's Gemini AI to generate predictions about physical characteristics and disease risks.
+
+### Core Capabilities
+- 🔬 **Gender Prediction**: ML-based sex prediction from SNP data
+- 🌍 **Ancestry Prediction**: Population/ancestry classification using genetic markers
+- 🧬 **Physical Characteristics**: AI-generated predictions for hair, eyes, skin, features
+- ⚕️ **Disease Risk Assessment**: Population-specific health risk analysis
+- 💬 **AI Agent Chat**: LangGraph-powered conversational interface for genetic analysis
+- 🖼️ **Portrait Generation**: AI-generated portraits based on genetic predictions
+
+---
+
+## 🏗️ Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       Flask Web Application                      │
+│                         (app.py - Port 5001)                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Routes (API + Pages)    │    ML Models     │    AI Agent       │
+│  - /api/samples          │    - Gender      │    - LangGraph    │
+│  - /api/analysis         │    - Ancestry    │    - Gemini LLM   │
+│  - /api/predictions      │    - Predictors  │    - Tools        │
+│  - /api/agent           │                   │    - Memory       │
+├─────────────────────────────────────────────────────────────────┤
+│          PostgreSQL (Users, History)  │  MongoDB (SNP Database)  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📁 Directory Structure
+
+```
+DNA/
+├── app.py                    # 🚀 Main Flask application entry point
+├── docker-compose.yml        # 🐳 Docker orchestration (PostgreSQL, MongoDB, Flask)
+├── requirements.txt          # 📦 Python dependencies
+│
+├── agent/                    # 🤖 AI Agent (LangGraph + Gemini)
+│   ├── workflow.py          # LangGraph workflow definition (DNAAgentWorkflow)
+│   ├── tools.py             # LangChain tools for genetic analysis
+│   ├── memory.py            # Chat memory management
+│   ├── config.py            # Agent configuration
+│   └── langsmith_utils.py   # LangSmith tracing integration
+│
+├── ml_models/               # 🧠 Machine Learning Models
+│   ├── predictors.py        # GeneticPredictor, SexPredictor, AncestryPredictor
+│   ├── gender_prediction_package/   # Gender prediction model files (.pkl)
+│   └── region_prediction_package/   # Ancestry prediction model files (.pkl)
+│
+├── routes/                  # 🛤️ Flask Blueprints (API & Pages)
+│   ├── __init__.py          # Blueprint registration
+│   ├── agent_routes.py      # /api/agent/* - Chat endpoints
+│   ├── analysis_routes.py   # /api/analysis/* - SNP analysis
+│   ├── predictions_routes.py # /api/predictions/* - ML predictions
+│   ├── samples_routes.py    # /api/samples/* - Sample management
+│   ├── auth_routes.py       # Authentication (login, register)
+│   ├── dashboard_routes.py  # User dashboard
+│   ├── history_routes.py    # Analysis history
+│   ├── risk_calculator_routes.py  # Disease risk calculator
+│   ├── snp_database_routes.py     # SNP database queries
+│   └── upload_routes.py     # File upload handling
+│
+├── database/               # 💾 Database Layer
+│   ├── models.py           # SQLAlchemy models (User, AnalysisHistory, SNPInfo)
+│   └── migrations/         # Alembic migrations
+│
+├── config/                 # ⚙️ Configuration
+│   ├── settings.py         # Environment-based config classes
+│   ├── database.py         # Database connection utilities
+│   └── mongodb.py          # MongoDB connection utilities
+│
+├── services/               # 🔧 Business Logic Services
+│   └── __init__.py         # Gemini API configuration
+│
+├── utils/                  # 🛠️ Utilities
+│   ├── formatting.py       # Response formatting helpers
+│   └── serialization.py    # Data serialization utilities
+│
+├── web/                    # 🎨 Frontend
+│   ├── templates/          # Jinja2 HTML templates
+│   │   ├── base.html       # Base template with nav
+│   │   ├── index.html      # Home page
+│   │   ├── chat.html       # AI Agent chat interface
+│   │   ├── dashboard.html  # User dashboard
+│   │   ├── upload.html     # File upload
+│   │   └── auth/           # Login, register, profile
+│   └── static/
+│       └── css/styles.css  # Application styles
+│
+├── uploads/                # 📤 User uploaded SNP files
+├── result/                 # 📊 Analysis result JSON files
+└── scripts/                # 📜 Utility scripts
+    ├── seed_snp_database.py      # MongoDB SNP seeder
+    └── migrate_sqlite_to_postgres.py
+```
+
+---
+
+## 🗃️ Database Models (SQLAlchemy)
+
+### User
+```python
+# database/models.py
+User:
+  - id: Integer (PK)
+  - username: String(80), unique
+  - email: String(120), unique
+  - password_hash: String(256)
+  - full_name: String(150)
+  - is_admin: Boolean
+  - analyses: Relationship → AnalysisHistory
+```
+
+### AnalysisHistory
+```python
+AnalysisHistory:
+  - id: Integer (PK)
+  - user_id: ForeignKey → User
+  - sample_id: String(100)
+  - analysis_type: String (combined, gender, ancestry, physical, disease_risk)
+  - gender_prediction: String
+  - gender_confidence: Float
+  - ancestry_prediction: String
+  - ancestry_code: String (CEU, YRI, JPT, etc.)
+  - ancestry_confidence: Float
+  - full_results: Text (JSON)
+  - physical_characteristics: Text
+  - disease_risk_report: Text
+  - file_name, file_path, snp_count, processing_time
+  - status: String (pending, processing, completed, failed)
+```
+
+### SNPInfo
+```python
+SNPInfo:
+  - rs_id: String (e.g., rs12345)
+  - chromosome: String
+  - position: Integer
+  - gene_name, gene_symbol
+  - ref_allele, alt_allele, minor_allele
+  - maf: Float (Minor Allele Frequency)
+  - clinical_significance
+  - associated_traits: Text (JSON)
+  - disease_associations: Text (JSON)
+```
+
+---
+
+## 🤖 AI Agent (LangGraph)
+
+### Workflow State (agent/workflow.py)
+```python
+class AgentState(TypedDict):
+    session_id: str
+    messages: List[Dict]
+    chat_history: List[Dict]
+    user_input: str
+    stage: str  # "init", "thinking", "tool_use", "responding", "complete", "error"
+    iteration: int
+    tool_calls: List[Dict]
+    tool_results: List[Dict]
+    response: str
+```
+
+### Workflow Nodes
+1. **analyze_intent** → Analyzes user intent, decides if tools needed
+2. **use_tools** → Executes LangChain tools
+3. **generate_response** → Creates final response with tool results
+4. **handle_error** → Graceful error handling
+
+### Available Tools (agent/tools.py)
+```python
+# Sample Tools
+list_available_samples()
+get_population_info(population_code)
+get_sample_info(sample_file)
+compare_samples(sample_file_1, sample_file_2)
+
+# Analysis Tools
+query_snp(sample_file, snp_id)
+query_multiple_snps(sample_file, snp_ids)
+analyze_snp_file(sample_file)
+get_snp_statistics(sample_file)
+
+# Prediction Tools
+predict_physical_characteristics(gender, population)
+assess_genetic_disease_risk(gender, population)
+get_physical_traits_from_sample(sample_file)
+get_disease_risk_from_sample(sample_file)
+full_genetic_report(sample_file)
+
+# Image Generation
+generate_person_image(gender, population, patient_id)
+generate_image_from_sample(sample_file)
+
+# Educational Tools
+get_genetic_fun_facts(topic)
+explain_snp_significance(snp_id)
+get_ancestry_deep_dive(gender, population)
+```
+
+---
+
+## 🌍 Population Codes
+
+| Code | Description |
+|------|-------------|
+| ASW | African ancestry in Southwest USA |
+| CEU | Utah residents (Northern/Western European) |
+| CHB | Han Chinese in Beijing, China |
+| CHD | Chinese in Metropolitan Denver |
+| GIH | Gujarati Indians in Houston, Texas |
+| JPT | Japanese in Tokyo, Japan |
+| LWK | Luhya in Webuye, Kenya |
+| MEX | Mexican ancestry in Los Angeles |
+| MKK | Maasai in Kinyawa, Kenya |
+| TSI | Tuscan in Italy |
+| YRI | Yoruban in Ibadan, Nigeria |
+
+---
+
+## 🔌 API Endpoints
+
+### Agent API
+```
+POST /api/agent/chat          # Send message to AI agent
+GET  /api/agent/history       # Get chat history
+POST /api/agent/clear         # Clear chat history
+```
+
+### Analysis API
+```
+POST /api/analysis/analyze    # Full SNP file analysis
+POST /api/analysis/snp        # Query single SNP
+POST /api/analysis/snp/multiple  # Query multiple SNPs
+POST /api/analysis/statistics # Get SNP statistics
+```
+
+### Predictions API
+```
+POST /api/predictions/physical       # Physical characteristics
+POST /api/predictions/disease-risk   # Disease risk assessment
+POST /api/predictions/full-report    # Complete genetic report
+POST /api/predictions/generate-person-image  # AI portrait
+POST /api/predictions/fun-facts      # Genetic fun facts
+```
+
+### Samples API
+```
+GET  /api/samples/list        # List available samples
+GET  /api/samples/populations # List all populations
+POST /api/samples/info        # Get sample info
+POST /api/samples/compare     # Compare two samples
+```
+
+---
+
+## 🔧 Environment Variables
+
+```env
+# Flask
+FLASK_SECRET_KEY=your_secret_key
+FLASK_ENV=development|production
+
+# PostgreSQL
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=genovaai
+POSTGRES_USER=genovaai_user
+POSTGRES_PASSWORD=secure_password
+
+# MongoDB
+MONGO_HOST=localhost
+MONGO_PORT=27017
+MONGO_DB=genovaai
+MONGO_USER=mongo_user
+MONGO_PASSWORD=mongo_password
+
+# APIs
+GEMINI_API_KEY=your_gemini_api_key
+
+# Admin
+ADMIN_USERNAME=admin
+ADMIN_EMAIL=admin@genovaai.com
+ADMIN_PASSWORD=admin123
+```
+
+---
+
+## 🎯 Development Guidelines
+
+### Adding New Routes
+1. Create route file in `routes/`
+2. Create Blueprint with appropriate prefix
+3. Register in `routes/__init__.py`
+
+### Adding New Agent Tools
+1. Define input schema using Pydantic in `agent/tools.py`
+2. Create tool function with `@tool` decorator
+3. Add to `get_all_tools()` list
+4. Tools call internal APIs at `http://127.0.0.1:5001`
+
+### Database Migrations
+```bash
+# Generate migration
+alembic revision --autogenerate -m "description"
+
+# Apply migration
+alembic upgrade head
+```
+
+### Running the App
+```bash
+# Development
+python app.py
+
+# Docker
+docker-compose up -d
+```
+
+---
+
+## 📝 Code Conventions
+
+- **Flask Blueprints**: Use `/api/` prefix for API routes, no prefix for page routes
+- **Database**: SQLAlchemy for PostgreSQL, PyMongo for MongoDB (SNP data)
+- **Authentication**: Flask-Login with password hashing (werkzeug)
+- **API Responses**: Return `{"success": bool, "data": {...}, "error": str}`
+- **Agent Tools**: Always return `Dict[str, Any]` with success/error pattern
+- **Templates**: Jinja2 in `web/templates/`, extend `base.html`
+- **Static Files**: CSS in `web/static/css/`
+
+---
+
+## 📄 File Formats
+
+### SNP Data Files
+In this project, **PED files (.ped) are identical to CSV files (.csv)** - they have the same content and format, just different file extensions. This is NOT the standard PLINK PED format.
+
+**Important:** When handling `.ped` files:
+- Treat them exactly as CSV files
+- Simply read them with `pd.read_csv()`
+- No conversion needed - just rename extension if required
+
+**CSV/PED File Structure:**
+```csv
+CHR,SNP,GEN_DIST,POS,Allele1,Allele2,Patient_ID,Population,Sex
+1,rs2185539,0,556738,A,A,NA18127,CHD,1
+1,rs11510103,0,557616,A,A,NA18127,CHD,1
+```
+
+**Required Columns:**
+- `SNP` - rsID values (e.g., rs2185539, rs4040617)
+- `CHR` - Chromosome number
+- `POS` - Position
+- `Allele1`, `Allele2` - Genotype alleles
+- `Patient_ID` - Sample identifier
+- `Population` - Population code (CEU, YRI, etc.)
+- `Sex` - 1=Male, 2=Female
+
+---
+
+## 🐳 Docker Services
+
+| Service | Image | Port | Purpose |
+|---------|-------|------|---------|
+| genovaai | Custom | 5001 | Flask Application |
+| postgres | postgres:15-alpine | 5432 | User/History Database |
+| mongodb | mongo:7.0 | 27017 | SNP Database |
+
+---
+
+## 🔍 Key Files Quick Reference
+
+| Task | File |
+|------|------|
+| App entry point | `app.py` |
+| Add database model | `database/models.py` |
+| Add API route | `routes/*.py` |
+| Add agent tool | `agent/tools.py` |
+| Modify agent behavior | `agent/workflow.py` |
+| ML prediction logic | `ml_models/predictors.py` |
+| Page templates | `web/templates/*.html` |
+| Docker config | `docker-compose.yml` |
+| Environment config | `config/settings.py` |
+

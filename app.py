@@ -19,7 +19,7 @@ except ImportError:
 load_dotenv()
 
 # Import from our modules
-from models import GeneticPredictor, POPULATION_INFO, find_model_directories
+from ml_models import GeneticPredictor, POPULATION_INFO, find_model_directories
 from services import configure_gemini
 from database import db, User, init_db, create_admin_user
 from config import get_database_url, wait_for_database, get_engine_options

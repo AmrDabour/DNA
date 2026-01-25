@@ -1,0 +1,263 @@
+[project]
+name = "dna-genetic-prediction"
+version = "1.0.0"
+description = "AI-powered DNA genetic prediction system for ancestry and trait analysis"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "DNA Prediction Team", email = "admin@genovaai.com"}
+]
+keywords = ["genetics", "dna", "machine-learning", "ancestry", "prediction"]
+
+dependencies = [
+    # Core Web Framework
+    "flask>=3.1.0",
+    "werkzeug>=3.0.0",
+    "flask-login>=0.6.0",
+    "flask-sqlalchemy>=3.1.0",
+    "flasgger>=0.9.7",
+    
+    # Machine Learning & Data Science
+    "numpy>=1.26.4,<2.0",
+    "pandas>=2.2.3",
+    "scikit-learn>=1.2.2",
+    "scipy>=1.13.1",
+    "joblib>=1.4.2",
+    "imbalanced-learn>=0.12.4",
+    
+    # Deep Learning Frameworks
+    "tensorflow>=2.18.0",
+    "keras>=3.5.0",
+    
+    # Gradient Boosting
+    "lightgbm>=4.5.0",
+    "xgboost>=2.0.3",
+    
+    # Visualization
+    "matplotlib>=3.7.5",
+    "seaborn>=0.12.2",
+    "plotly>=5.24.1",
+    
+    # NLP & Embeddings
+    "nltk>=3.9.1",
+    "spacy>=3.7.5",
+    "gensim>=4.3.3",
+    "transformers>=4.51.1",
+    
+    # Dimensionality Reduction
+    "umap-learn>=0.5.7",
+    
+    # Statistical Analysis
+    "statsmodels>=0.14.4",
+    
+    # Computer Vision
+    "opencv-python>=4.10.0.82",
+    "pillow>=11.1.0",
+    
+    # AI Agent & LLM
+    "google-generativeai>=2.0.0",
+    "google-genai>=0.2.0",
+    "langchain>=0.2.0",
+    "langgraph>=0.1.0",
+    "langchain-google-genai>=1.0.0",
+    "langchain-core>=0.2.0",
+    "langsmith>=0.1.0",
+    
+    # Database
+    "sqlalchemy>=2.0.38",
+    "psycopg2-binary>=2.9.9",
+    "alembic>=1.13.0",
+    "pymongo>=4.6.0",
+    
+    # Cloud Storage
+    "boto3>=1.37.29",
+    "google-cloud-storage>=2.14.0",
+    
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "requests>=2.32.3",
+    "tqdm>=4.67.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+jupyter = [
+    "jupyterlab>=3.6.8",
+    "notebook>=6.5.4",
+    "ipywidgets>=8.1.5",
+]
+
+production = [
+    "gunicorn>=21.0.0",
+]
+
+all = [
+    "dna-genetic-prediction[dev,jupyter,production]",
+]
+
+[project.urls]
+Homepage = "https://github.com/AmrDabour/DNA"
+Documentation = "https://github.com/AmrDabour/DNA/wiki"
+Repository = "https://github.com/AmrDabour/DNA"
+Issues = "https://github.com/AmrDabour/DNA/issues"
+
+[build-system]
+requires = ["setuptools>=75.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["agent", "config", "database", "ml_models", "routes", "services", "utils"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.yaml", "*.yml", "*.txt"]
+
+# ============================================================
+# Testing Configuration
+# ============================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",                      # Verbose output
+    "--strict-markers",        # Raise error on unknown markers
+    "--tb=short",              # Short traceback format
+]
+# For coverage reports, install pytest-cov and run:
+# pytest --cov=. --cov-report=term-missing --cov-report=html
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# ============================================================
+# Code Quality Tools
+# ============================================================
+
+[tool.black]
+line-length = 120
+target-version = ["py38", "py39", "py310", "py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.git
+  | \.venv
+  | env
+  | venv
+  | build
+  | dist
+  | migrations
+  | __pycache__
+)/
+'''
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+exclude = [
+    ".git",
+    ".venv",
+    "env",
+    "venv",
+    "build",
+    "dist",
+    "migrations",
+    "__pycache__",
+    "*.egg-info",
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+
+[tool.ruff.isort]
+known-first-party = ["agent", "config", "database", "models", "routes", "services", "utils"]
+
+# ============================================================
+# Type Checking
+# ============================================================
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_optional = true
+
+[[tool.mypy.overrides]]
+module = [
+    "sklearn.*",
+    "scipy.*",
+    "keras.*",
+    "tensorflow.*",
+    "plotly.*",
+    "seaborn.*",
+    "lightgbm.*",
+    "xgboost.*",
+    "cv2.*",
+    "spacy.*",
+    "gensim.*",
+    "transformers.*",
+    "umap.*",
+]
+ignore_missing_imports = true
+
+# ============================================================
+# Coverage
+# ============================================================
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/env/*",
+    "*/migrations/*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+

@@ -220,18 +220,134 @@
     }
 
     /* Disease risk report styling */
+    .disease-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
     .disease-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+        border-radius: 12px;
+        padding: 1.25rem;
+        border-left: 4px solid;
         transition: transform 0.3s, box-shadow 0.3s;
     }
 
     .disease-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+    
+    .disease-card.risk-high {
+        border-left-color: #ef4444;
+    }
+    
+    .disease-card.risk-moderate {
+        border-left-color: #f59e0b;
+    }
+    
+    .disease-card.risk-low {
+        border-left-color: #22c55e;
+    }
+    
+    .disease-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
+    }
+    
+    .disease-card-title {
+        font-weight: 700;
+        font-size: 1rem;
+        color: #fff;
+        margin: 0;
     }
 
     .risk-badge {
-        font-size: 0.9rem;
-        padding: 0.4rem 0.7rem;
+        font-size: 0.7rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 20px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .risk-badge.high {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    
+    .risk-badge.moderate {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    
+    .risk-badge.low {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    
+    .disease-meta {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+    }
+    
+    .disease-meta-item {
+        font-size: 0.75rem;
+    }
+    
+    .disease-meta-item .label {
+        color: #64748b;
+        margin-right: 0.25rem;
+    }
+    
+    .disease-meta-item .value {
+        color: #94a3b8;
+        font-family: 'Monaco', 'Consolas', monospace;
+    }
+    
+    .disease-description {
+        font-size: 0.85rem;
+        color: #94a3b8;
+        line-height: 1.5;
+        margin: 0;
+    }
+    
+    .disease-profile {
+        text-align: center;
+        padding: 0.75rem 1rem;
+        background: rgba(139, 92, 246, 0.1);
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+    
+    .disease-profile-text {
+        color: #a78bfa;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .disease-disclaimer {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        background: rgba(251, 191, 36, 0.1);
+        border-radius: 8px;
+        border-left: 3px solid #fbbf24;
+    }
+    
+    .disease-disclaimer p {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #fbbf24;
     }
 
     .recommendations-list {
@@ -319,6 +435,128 @@
             break-inside: avoid;
             page-break-inside: avoid;
         }
+    }
+    
+    /* Physical Characteristics Grid */
+    .characteristics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        padding: 0.5rem;
+    }
+    
+    .char-box {
+        background: rgba(30, 41, 59, 0.6);
+        border-radius: 12px;
+        padding: 1.25rem;
+        text-align: center;
+        border: 1px solid var(--glass-border);
+        transition: all 0.3s ease;
+    }
+    
+    .char-box:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    .char-box .char-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .char-box h5 {
+        color: var(--text-primary);
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+    
+    .char-box p {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin: 0.25rem 0;
+        line-height: 1.4;
+    }
+    
+    .char-box strong {
+        color: var(--primary);
+    }
+    
+    /* Box color accents */
+    .char-box.hair { border-top: 3px solid #f59e0b; }
+    .char-box.eyes { border-top: 3px solid #06b6d4; }
+    .char-box.skin { border-top: 3px solid #ec4899; }
+    .char-box.face { border-top: 3px solid #8b5cf6; }
+    .char-box.body { border-top: 3px solid #10b981; }
+    .char-box.traits { border-top: 3px solid #6366f1; }
+    
+    .physical-header {
+        text-align: center;
+        padding: 0.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .characteristics-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .characteristics-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    /* Markdown Content Styling (for Disease Risk) */
+    .markdown-content {
+        padding: 1rem;
+        line-height: 1.7;
+    }
+    
+    .markdown-content h2 {
+        color: var(--primary);
+        font-size: 1.4rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--glass-border);
+    }
+    
+    .markdown-content h3 {
+        color: var(--text-primary);
+        font-size: 1.1rem;
+        margin: 1.25rem 0 0.5rem;
+    }
+    
+    .markdown-content ul {
+        list-style: none;
+        padding: 0;
+        margin: 0.5rem 0;
+    }
+    
+    .markdown-content ul li {
+        padding: 0.4rem 0.75rem;
+        margin: 0.25rem 0;
+        background: rgba(139, 92, 246, 0.08);
+        border-radius: 6px;
+        border-left: 3px solid #8b5cf6;
+        font-size: 0.9rem;
+    }
+    
+    .markdown-content strong {
+        color: var(--primary);
+    }
+    
+    .markdown-content hr {
+        border: none;
+        height: 1px;
+        background: var(--glass-border);
+        margin: 1rem 0;
+    }
+    
+    .markdown-content p {
+        margin: 0.5rem 0;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
     }
 </style>
 {% endblock %}
@@ -668,6 +906,8 @@
 {% block extra_js %}
 <!-- html2pdf Library for PDF Export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- Marked.js for Markdown rendering -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 
 <script>
     // PDF Export Function
@@ -812,11 +1052,11 @@
                 resultEl.innerHTML = '';
 
                 // Get the prediction data from the page
-                const genderPrediction = {{ results.gender | tojson if results.gender else 'null'
-            }};
-        const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null'
-    }};
-        const sampleId = '{{ sample_id }}';
+                const genderPrediction = {{ results.gender | tojson if results.gender else 'null' }};
+                const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null' }};
+                const sampleId = '{{ sample_id }}';
+                
+                console.log('Sending to API:', { gender: genderPrediction, ancestry: ancestryPrediction });
 
                 // Call the API
                 fetch('/get_physical_characteristics', {
@@ -835,8 +1075,44 @@
             loadingEl.style.display = 'none';
 
             if (data.success) {
-                // Display the HTML content directly
-                resultEl.innerHTML = data.characteristics;
+                const c = data.characteristics;
+                
+                resultEl.innerHTML = `
+                    <div class="characteristics-grid">
+                        <div class="char-box hair">
+                            <div class="char-icon">💇</div>
+                            <h5>Hair</h5>
+                            <p><strong>Color:</strong> ${c.hair?.color || 'Variable'}</p>
+                            <p><strong>Texture:</strong> ${c.hair?.texture || 'Variable'}</p>
+                        </div>
+                        <div class="char-box eyes">
+                            <div class="char-icon">👁️</div>
+                            <h5>Eyes</h5>
+                            <p><strong>Color:</strong> ${c.eyes?.color || 'Variable'}</p>
+                            <p><strong>Shape:</strong> ${c.eyes?.shape || 'Variable'}</p>
+                        </div>
+                        <div class="char-box skin">
+                            <div class="char-icon">🎨</div>
+                            <h5>Skin</h5>
+                            <p><strong>Tone:</strong> ${c.skin?.tone || 'Variable'}</p>
+                        </div>
+                        <div class="char-box face">
+                            <div class="char-icon">👤</div>
+                            <h5>Face</h5>
+                            <p>${c.face?.features || 'Variable features'}</p>
+                        </div>
+                        <div class="char-box body">
+                            <div class="char-icon">🏃</div>
+                            <h5>Body</h5>
+                            <p>${c.body?.build || 'Variable build'}</p>
+                        </div>
+                        <div class="char-box traits">
+                            <div class="char-icon">✨</div>
+                            <h5>Other Traits</h5>
+                            <p>${c.traits?.other || 'Various distinctive features'}</p>
+                        </div>
+                    </div>
+                `;
                 
                 // Show the image generation section after successful physical characteristics prediction
                 const imageSection = document.getElementById('image-generation-section');
@@ -877,10 +1153,11 @@
             resultEl.innerHTML = '';
 
             // Get the prediction data from the page
-            const genderPrediction = {{ results.gender | tojson if results.gender else 'null'
-        }};
-    const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null' }};
-    const patientIdForDisease = '{{ sample_id }}';
+            const genderPrediction = {{ results.gender | tojson if results.gender else 'null' }};
+            const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null' }};
+            const patientIdForDisease = '{{ sample_id }}';
+            
+            console.log('Disease Risk - Sending:', { gender: genderPrediction, ancestry: ancestryPrediction });
 
             // Call the API
             fetch('/get_disease_risk_report', {
@@ -894,35 +1171,69 @@
                     sample_id: patientIdForDisease
                 }),
             })
-        .then(response => response.json())
-        .then(data => {
-            loadingEl.style.display = 'none';
+            .then(response => response.json())
+            .then(data => {
+                loadingEl.style.display = 'none';
+                console.log('Disease Risk Response:', data);
 
-            if (data.success) {
-                // Display the HTML content directly
-                resultEl.innerHTML = data.report;
-            } else {
-                // Show error
-                resultEl.innerHTML = `
-                            <div class="alert alert-danger">
-                                <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
-                                <p>${data.error}</p>
+                if (data.success && data.diseases && data.diseases.length > 0) {
+                    // Build disease cards HTML
+                    const getRiskIcon = (risk) => {
+                        if (risk === 'high') return '🔴';
+                        if (risk === 'moderate') return '🟡';
+                        return '🟢';
+                    };
+                    
+                    let cardsHTML = data.diseases.map(d => `
+                        <div class="disease-card risk-${d.risk || 'moderate'}">
+                            <div class="disease-card-header">
+                                <h6 class="disease-card-title">${getRiskIcon(d.risk)} ${d.name || 'Unknown Disease'}</h6>
+                                <span class="risk-badge ${d.risk || 'moderate'}">${(d.risk || 'moderate').toUpperCase()}</span>
                             </div>
-                        `;
-            }
-        })
-        .catch(error => {
-            loadingEl.style.display = 'none';
-            resultEl.innerHTML = `
-                        <div class="alert alert-danger">
-                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
-                            <p>Failed to connect to the server. Please try again later.</p>
+                            <div class="disease-meta">
+                                <div class="disease-meta-item">
+                                    <span class="label">Genes:</span>
+                                    <span class="value">${d.genes || 'N/A'}</span>
+                                </div>
+                                <div class="disease-meta-item">
+                                    <span class="label">Prevalence:</span>
+                                    <span class="value">${d.prevalence || 'N/A'}</span>
+                                </div>
+                            </div>
+                            <p class="disease-description">${d.description || 'No description available.'}</p>
+                        </div>
+                    `).join('');
+                    
+                    resultEl.innerHTML = `
+                        <div class="disease-grid">
+                            ${cardsHTML}
+                        </div>
+                        <div class="disease-disclaimer">
+                            <p>⚠️ <strong>Medical Disclaimer:</strong> This is for informational purposes only. Consult a healthcare provider for personalized advice.</p>
                         </div>
                     `;
-            console.error('Error:', error);
-        });
+                } else {
+                    // Show error
+                    resultEl.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                            <p>${data.error || 'No disease data returned'}</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                loadingEl.style.display = 'none';
+                resultEl.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                        <p>Failed to connect to the server. Please try again later.</p>
+                    </div>
+                `;
+                console.error('Error:', error);
             });
-        }
+        });
+    }
 
     // Handle generate person image button
     const generateImageBtn = document.getElementById('generate-person-image');

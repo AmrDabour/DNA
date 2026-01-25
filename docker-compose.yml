@@ -118,12 +118,12 @@ services:
       # Development: Mount source code for live reload (comment out for production)
       - ./app.py:/app/app.py:ro
       - ./routes:/app/routes:ro
-      - ./templates:/app/templates:ro
-      - ./static:/app/static:ro
+      - ./web/templates:/app/web/templates:ro
+      - ./web/static:/app/web/static:ro
       - ./services:/app/services:ro
       - ./utils:/app/utils:ro
       - ./config:/app/config:ro
-      - ./new_model:/app/new_model:ro
+      - ./ml_models:/app/ml_models:ro
       - ./agent:/app/agent:ro
       - ./scripts:/app/scripts:ro
       # Persist uploads and results
