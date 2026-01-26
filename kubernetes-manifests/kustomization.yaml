@@ -1,0 +1,44 @@
+# ============================================================
+# GenovaAI - Kustomization Configuration
+# ============================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: genovaai
+
+# Resources in order of dependency
+resources:
+  # 1. Namespace (must be first)
+  - namespace.yaml
+  
+  # 2. Secrets and ConfigMaps
+  - secrets-configmap.yaml
+  
+  # 3. Database StatefulSets (order: postgres -> mongodb -> redis -> rabbitmq)
+  - postgres.yaml
+  - mongodb.yaml
+  - redis.yaml
+  - rabbitmq.yaml
+  
+  # 4. Application Deployments
+  - genovaai.yaml
+  - celery-worker.yaml
+  - celery-beat.yaml
+  - flower.yaml
+  
+  # 5. Monitoring Stack
+  - prometheus.yaml
+  - grafana.yaml
+  
+  # 6. Nginx Ingress (must be last - depends on all services)
+  - nginx.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: genovaai
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: genovaai-platform
+
+# Common annotations
+commonAnnotations:
+  app.kubernetes.io/version: "1.0.0"

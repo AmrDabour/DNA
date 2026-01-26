@@ -1,0 +1,75 @@
+# ============================================================
+# Celery Beat Deployment (Scheduler)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: genovaai
+  labels:
+    app: genovaai
+    component: celery-beat
+spec:
+  replicas: 1  # Only one beat scheduler should run
+  strategy:
+    type: Recreate  # Ensure only one instance runs at a time
+  selector:
+    matchLabels:
+      app: genovaai
+      component: celery-beat
+  template:
+    metadata:
+      labels:
+        app: genovaai
+        component: celery-beat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: wait-for-rabbitmq
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done;']
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redis 6379; do echo waiting for redis; sleep 2; done;']
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+      containers:
+        - name: celery-beat
+          image: amrdabour/genovaai:latest
+          imagePullPolicy: Always
+          command:
+            - celery
+            - -A
+            - celery_app
+            - beat
+            - --loglevel=INFO
+          envFrom:
+            - configMapRef:
+                name: genovaai-config
+            - secretRef:
+                name: genovaai-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+              ephemeral-storage: "256Mi"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+              ephemeral-storage: "512Mi"
+          livenessProbe:
+            exec:
+              command:
+                - pgrep
+                - -f
+                - "celery.*beat"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5

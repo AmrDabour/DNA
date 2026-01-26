@@ -1,0 +1,131 @@
+# ============================================================
+# GenovaAI Main Application Deployment
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genovaai
+  namespace: genovaai
+  labels:
+    app: genovaai
+    component: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: genovaai
+      component: web
+  template:
+    metadata:
+      labels:
+        app: genovaai
+        component: web
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done;']
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+      containers:
+        - name: genovaai
+          image: amrdabour/genovaai:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: genovaai-config
+            - secretRef:
+                name: genovaai-secrets
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            - name: results
+              mountPath: /app/result
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+              ephemeral-storage: "1Gi"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+              ephemeral-storage: "5Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: genovaai-uploads-pvc
+        - name: results
+          persistentVolumeClaim:
+            claimName: genovaai-results-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genovaai
+  namespace: genovaai
+  labels:
+    app: genovaai
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: 5000
+      name: http
+  selector:
+    app: genovaai
+    component: web
+---
+# ============================================================
+# Persistent Volume Claims for uploads and results
+# ============================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: genovaai-uploads-pvc
+  namespace: genovaai
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: genovaai-results-pvc
+  namespace: genovaai
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi

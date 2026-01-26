@@ -1,0 +1,128 @@
+# ============================================================
+# GenovaAI - Deploy to Kubernetes
+# ============================================================
+name: Deploy to Kubernetes
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: 'Image tag to deploy (leave empty for latest)'
+        required: false
+        type: string
+
+env:
+  GKE_CLUSTER: genovaai-cluster
+  GKE_REGION: us-central1
+  NAMESPACE: genovaai
+
+jobs:
+  deploy-gke:
+    name: Deploy to GKE Autopilot
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install gke-gcloud-auth-plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region ${{ env.GKE_REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Update image tag if specified
+        if: inputs.image_tag != ''
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag }}"
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/genovaai.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/celery-worker.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/celery-beat.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/flower.yaml
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Apply kustomization
+          kubectl apply -k kubernetes-manifests/
+          
+          echo "Waiting for deployments to be ready..."
+
+      - name: Wait for GenovaAI deployment
+        run: |
+          kubectl rollout status deployment/genovaai -n ${{ env.NAMESPACE }} --timeout=10m
+
+      - name: Wait for Celery Worker deployment
+        run: |
+          kubectl rollout status deployment/celery-worker -n ${{ env.NAMESPACE }} --timeout=10m
+
+      - name: Wait for Celery Beat deployment
+        run: |
+          kubectl rollout status deployment/celery-beat -n ${{ env.NAMESPACE }} --timeout=5m
+
+      - name: Wait for databases
+        run: |
+          kubectl rollout status statefulset/postgres -n ${{ env.NAMESPACE }} --timeout=5m
+          kubectl rollout status statefulset/mongodb -n ${{ env.NAMESPACE }} --timeout=5m
+          kubectl rollout status statefulset/redis -n ${{ env.NAMESPACE }} --timeout=5m
+          kubectl rollout status statefulset/rabbitmq -n ${{ env.NAMESPACE }} --timeout=5m
+
+      - name: Verify deployment
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          echo ""
+          echo "=== Services ==="
+          kubectl get services -n ${{ env.NAMESPACE }}
+          echo ""
+          echo "=== Ingress/LoadBalancer ==="
+          kubectl get svc nginx -n ${{ env.NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+          echo ""
+
+      - name: Run health check
+        run: |
+          # Get the LoadBalancer IP
+          LB_IP=$(kubectl get svc nginx -n ${{ env.NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          
+          if [ -n "$LB_IP" ]; then
+            echo "Testing health endpoint at http://$LB_IP/health"
+            curl -sf "http://$LB_IP/health" || echo "Health check pending - LoadBalancer may still be initializing"
+          else
+            echo "LoadBalancer IP not yet assigned"
+          fi
+
+      - name: Print access information
+        run: |
+          LB_IP=$(kubectl get svc nginx -n ${{ env.NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "======================================"
+          echo "Deployment Complete!"
+          echo "======================================"
+          if [ -n "$LB_IP" ]; then
+            echo "Application URL: http://$LB_IP"
+            echo "Flower (Celery): http://$LB_IP/flower/"
+            echo "Grafana:         http://$LB_IP/grafana/"
+            echo "Prometheus:      http://$LB_IP/prometheus/"
+            echo "RabbitMQ:        http://$LB_IP/rabbitmq/"
+          else
+            echo "LoadBalancer IP pending. Run:"
+            echo "  kubectl get svc nginx -n ${{ env.NAMESPACE }}"
+          fi

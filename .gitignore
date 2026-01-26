@@ -65,3 +65,16 @@ data/redis/
 
 # Certbot
 certbot/
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfplan
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl
+
+# Local result tracking
+result/
+!result/.gitkeep

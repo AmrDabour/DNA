@@ -1,0 +1,10 @@
+# ============================================================
+# GenovaAI - Namespace
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: genovaai
+  labels:
+    app.kubernetes.io/name: genovaai
+    app.kubernetes.io/managed-by: kustomize
