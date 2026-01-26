@@ -52,3 +52,43 @@ python app.py
 - The AI-based predictions (physical characteristics and disease risks) require a valid Google Gemini API key
 - The predictions are based on statistical correlations and should not be used for medical diagnosis
 - Sample data must be properly formatted (see documentation) 
+
+---
+
+## 🐳 Running with Docker Compose
+
+```bash
+# 1. Copy environment template
+cp config/env.example .env
+
+# 2. Edit .env and add your GEMINI_API_KEY
+
+# 3. Start all services
+docker-compose up -d
+```
+
+---
+
+## ☸️ Running on Kubernetes
+
+### Local Development (Docker Desktop / Minikube)
+
+```bash
+# 1. Copy and edit the secrets file (one time only)
+cp kubernetes-manifests/k8s.env.example kubernetes-manifests/k8s.env
+# Edit k8s.env and add your GEMINI_API_KEY
+
+# 2. Deploy! (reads from k8s.env automatically)
+kubectl apply -k kubernetes-manifests/
+
+# 3. Access the application
+kubectl port-forward -n genovaai svc/genovaai 5000:5000
+# Open: http://localhost:5000
+```
+
+### Production (GKE / Cloud)
+
+1. Add secrets to GitHub Repository Settings → Secrets → Actions
+2. Run the "Deploy to Kubernetes" workflow
+
+For more details, see [kubernetes-manifests/SECRETS_MANAGEMENT.md](kubernetes-manifests/SECRETS_MANAGEMENT.md) 

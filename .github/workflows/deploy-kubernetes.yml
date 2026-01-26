@@ -51,6 +51,31 @@ jobs:
             --region ${{ env.GKE_REGION }} \
             --project ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Generate Kubernetes Secrets from GitHub Secrets
+        env:
+          FLASK_SECRET_KEY: ${{ secrets.FLASK_SECRET_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          MONGO_PASSWORD: ${{ secrets.MONGO_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+        run: |
+          # Generate secrets from template
+          cd kubernetes-manifests
+          
+          # Substitute placeholders in template
+          sed -e "s|{{FLASK_SECRET_KEY}}|${FLASK_SECRET_KEY}|g" \
+              -e "s|{{POSTGRES_PASSWORD}}|${POSTGRES_PASSWORD}|g" \
+              -e "s|{{MONGO_PASSWORD}}|${MONGO_PASSWORD}|g" \
+              -e "s|{{REDIS_PASSWORD}}|${REDIS_PASSWORD}|g" \
+              -e "s|{{RABBITMQ_PASSWORD}}|${RABBITMQ_PASSWORD}|g" \
+              -e "s|{{GEMINI_API_KEY}}|${GEMINI_API_KEY}|g" \
+              -e "s|{{LANGCHAIN_API_KEY}}|${LANGCHAIN_API_KEY:-}|g" \
+              secrets.template.yaml > secrets.generated.yaml
+          
+          echo "✅ Secrets generated from GitHub Secrets"
+
       - name: Update image tag if specified
         if: inputs.image_tag != ''
         run: |
@@ -60,9 +85,14 @@ jobs:
           sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/celery-beat.yaml
           sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/flower.yaml
 
+      - name: Deploy Secrets first
+        run: |
+          kubectl apply -f kubernetes-manifests/secrets.generated.yaml
+          echo "✅ Secrets deployed"
+
       - name: Deploy to Kubernetes
         run: |
-          # Apply kustomization
+          # Apply kustomization (excluding secrets template)
           kubectl apply -k kubernetes-manifests/
           
           echo "Waiting for deployments to be ready..."

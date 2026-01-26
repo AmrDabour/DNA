@@ -94,6 +94,9 @@ def create_celery_app(flask_app=None):
 # Create the celery app instance (None if disabled)
 celery_app = create_celery_app()
 
+# Alias for backwards compatibility
+celery = celery_app
+
 
 # ============================================================
 # Task Decorator Helper

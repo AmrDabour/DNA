@@ -10,7 +10,7 @@ metadata:
     app: genovaai
     component: celery-worker
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: genovaai
@@ -42,57 +42,57 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
       containers:
-        - name: celery-worker
-          image: amrdabour/genovaai:latest
-          imagePullPolicy: Always
-          command:
+      - name: celery-worker
+        image: amrdabour/genovaai:v1.2
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - celery_app
+        - worker
+        - --loglevel=INFO
+        - --concurrency=4
+        envFrom:
+        - configMapRef:
+            name: genovaai-config
+        - secretRef:
+            name: genovaai-secrets
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads
+        - name: results
+          mountPath: /app/result
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+            ephemeral-storage: "512Mi"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+            ephemeral-storage: "2Gi"
+        readinessProbe:
+          exec:
+            command:
             - celery
             - -A
             - celery_app
-            - worker
-            - --loglevel=INFO
-            - --concurrency=4
-          envFrom:
-            - configMapRef:
-                name: genovaai-config
-            - secretRef:
-                name: genovaai-secrets
-          volumeMounts:
-            - name: uploads
-              mountPath: /app/uploads
-            - name: results
-              mountPath: /app/result
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "250m"
-              ephemeral-storage: "1Gi"
-            limits:
-              memory: "4Gi"
-              cpu: "2000m"
-              ephemeral-storage: "5Gi"
-          readinessProbe:
-            exec:
-              command:
-                - celery
-                - -A
-                - celery_app
-                - inspect
-                - ping
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
-          livenessProbe:
-            exec:
-              command:
-                - celery
-                - -A
-                - celery_app
-                - inspect
-                - ping
-            initialDelaySeconds: 60
-            periodSeconds: 60
-            timeoutSeconds: 10
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - celery_app
+            - inspect
+            - ping
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 10
       volumes:
         - name: uploads
           persistentVolumeClaim:

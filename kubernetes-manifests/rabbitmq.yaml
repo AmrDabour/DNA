@@ -46,6 +46,10 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq:3-management-alpine
+          securityContext:
+            runAsUser: 999
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
           ports:
             - containerPort: 5672
               name: amqp
@@ -64,8 +68,6 @@ spec:
                 secretKeyRef:
                   name: genovaai-secrets
                   key: RABBITMQ_DEFAULT_PASS
-            - name: RABBITMQ_ENABLED_PLUGINS
-              value: "rabbitmq_management,rabbitmq_prometheus"
           volumeMounts:
             - name: rabbitmq-data
               mountPath: /var/lib/rabbitmq
@@ -96,11 +98,6 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 30
             timeoutSeconds: 15
-  volumeClaimTemplates:
-    - metadata:
-        name: rabbitmq-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 5Gi
+      volumes:
+        - name: rabbitmq-data
+          emptyDir: {}

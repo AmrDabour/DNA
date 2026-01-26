@@ -1,0 +1,41 @@
+# ============================================================
+# GenovaAI - ConfigMaps (Non-sensitive configuration)
+# ============================================================
+# This file contains non-sensitive configuration.
+# Secrets are managed separately via secrets.template.yaml
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: genovaai-config
+  namespace: genovaai
+data:
+  # Flask Configuration
+  FLASK_APP: "app.py"
+  FLASK_ENV: "production"
+  FLASK_DEBUG: "0"
+  
+  # Database Hosts (Kubernetes service names)
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  MONGO_HOST: "mongodb"
+  MONGO_PORT: "27017"
+  MONGO_DB: "genovaai"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
+  
+  # Celery Configuration
+  CELERY_ENABLED: "true"
+  CELERY_WORKER_CONCURRENCY: "4"
+  CELERY_WORKER_LOGLEVEL: "INFO"
+  
+  # Application Configuration
+  UPLOAD_FOLDER: "/app/uploads"
+  RESULT_FOLDER: "/app/result"
+  MAX_CONTENT_LENGTH: "52428800"
+  
+  # LangSmith Configuration
+  LANGCHAIN_TRACING_V2: "false"
+  LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"

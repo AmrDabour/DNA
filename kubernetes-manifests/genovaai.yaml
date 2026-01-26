@@ -10,7 +10,7 @@ metadata:
     app: genovaai
     component: web
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: genovaai
@@ -37,47 +37,47 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
       containers:
-        - name: genovaai
-          image: amrdabour/genovaai:latest
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 5000
-              name: http
-          envFrom:
-            - configMapRef:
-                name: genovaai-config
-            - secretRef:
-                name: genovaai-secrets
-          volumeMounts:
-            - name: uploads
-              mountPath: /app/uploads
-            - name: results
-              mountPath: /app/result
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "250m"
-              ephemeral-storage: "1Gi"
-            limits:
-              memory: "2Gi"
-              cpu: "2000m"
-              ephemeral-storage: "5Gi"
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 5000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 5000
-            initialDelaySeconds: 30
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 3
+      - name: genovaai
+        image: amrdabour/genovaai:v1.2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5001
+          name: http
+        envFrom:
+        - configMapRef:
+            name: genovaai-config
+        - secretRef:
+            name: genovaai-secrets
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads
+        - name: results
+          mountPath: /app/result
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+            ephemeral-storage: "512Mi"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+            ephemeral-storage: "2Gi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
       volumes:
         - name: uploads
           persistentVolumeClaim:
@@ -97,7 +97,7 @@ spec:
   type: ClusterIP
   ports:
     - port: 5000
-      targetPort: 5000
+      targetPort: 5001
       name: http
   selector:
     app: genovaai
@@ -113,7 +113,7 @@ metadata:
   namespace: genovaai
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
@@ -125,7 +125,7 @@ metadata:
   namespace: genovaai
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi

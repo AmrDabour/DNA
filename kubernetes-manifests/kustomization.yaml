@@ -1,20 +1,31 @@
 # ============================================================
 # GenovaAI - Kustomization Configuration
 # ============================================================
+# Secrets are auto-generated from .env file!
+# Just put GEMINI_API_KEY in .env and run: kubectl apply -k kubernetes-manifests/
+# ============================================================
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: genovaai
+
+# Auto-generate secrets from .env file
+secretGenerator:
+  - name: genovaai-secrets
+    envs:
+      - k8s.env
+    options:
+      disableNameSuffixHash: true
 
 # Resources in order of dependency
 resources:
   # 1. Namespace (must be first)
   - namespace.yaml
   
-  # 2. Secrets and ConfigMaps
-  - secrets-configmap.yaml
+  # 2. ConfigMaps (non-sensitive config)
+  - configmap.yaml
   
-  # 3. Database StatefulSets (order: postgres -> mongodb -> redis -> rabbitmq)
+  # 3. Database StatefulSets
   - postgres.yaml
   - mongodb.yaml
   - redis.yaml
@@ -30,14 +41,11 @@ resources:
   - prometheus.yaml
   - grafana.yaml
   
-  # 6. Nginx Ingress (must be last - depends on all services)
+  # 6. Nginx Ingress
   - nginx.yaml
 
-# Common labels applied to all resources
-commonLabels:
-  app.kubernetes.io/name: genovaai
-  app.kubernetes.io/managed-by: kustomize
-  app.kubernetes.io/part-of: genovaai-platform
+# Note: commonLabels removed to avoid selector immutability issues
+# Labels are defined directly in each resource file
 
 # Common annotations
 commonAnnotations:

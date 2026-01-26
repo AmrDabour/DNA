@@ -41,30 +41,30 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
       containers:
-        - name: celery-beat
-          image: amrdabour/genovaai:latest
-          imagePullPolicy: Always
-          command:
-            - celery
-            - -A
-            - celery_app
-            - beat
-            - --loglevel=INFO
-          envFrom:
-            - configMapRef:
-                name: genovaai-config
-            - secretRef:
-                name: genovaai-secrets
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "100m"
-              ephemeral-storage: "256Mi"
-            limits:
-              memory: "256Mi"
-              cpu: "500m"
-              ephemeral-storage: "512Mi"
-          livenessProbe:
+      - name: celery-beat
+        image: amrdabour/genovaai:v1.2
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - celery_app
+        - beat
+        - --loglevel=INFO
+        envFrom:
+        - configMapRef:
+            name: genovaai-config
+        - secretRef:
+            name: genovaai-secrets
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+            ephemeral-storage: "128Mi"
+          limits:
+            memory: "128Mi"
+            cpu: "250m"
+            ephemeral-storage: "256Mi"
+        livenessProbe:
             exec:
               command:
                 - pgrep

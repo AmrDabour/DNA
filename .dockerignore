@@ -75,8 +75,17 @@ temp/
 # K8s similar folder (not needed for Docker)
 k8s similar/
 
+# Terraform files
+terraform/
+.terraform/
+*.tfstate
+*.tfstate.*
+
 # Test data that's not needed
 *.bak
+*.ped
+*.csv
+data/
 
 # SSL Certificates (mounted separately)
 nginx/ssl/*.pem

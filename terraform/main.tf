@@ -93,23 +93,6 @@ resource "null_resource" "apply_deployment" {
   ]
 }
 
-# Wait condition for all Pods to be ready
-resource "null_resource" "wait_conditions" {
-  triggers = {
-    deployment = null_resource.apply_deployment.id
-  }
-
-  provisioner "local-exec" {
-    interpreter = ["PowerShell", "-Command"]
-    command     = <<-EOT
-    Write-Host "Waiting for metrics API to be available..."
-    kubectl wait --for=condition=AVAILABLE apiservice/v1beta1.metrics.k8s.io --timeout=300s 2>$null
-    Write-Host "Waiting for pods to be ready (this may take a while for GKE Autopilot to scale)..."
-    kubectl wait --for=condition=ready pods --all -n ${var.namespace} --timeout=600s
-    EOT
-  }
-
-  depends_on = [
-    null_resource.apply_deployment
-  ]
-}
+# Wait condition for all Pods to be ready (optional - removed to prevent timeout issues)
+# For GKE Autopilot, use: kubectl get pods -n genovaai -w
+# to monitor pod status after deployment
