@@ -1,0 +1,11 @@
+# SSL Certificate Placeholder
+# 
+# Place your SSL certificates here:
+# - fullchain.pem (certificate + intermediate)
+# - privkey.pem (private key)
+#
+# For Let's Encrypt, use certbot:
+# certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
+#
+# DO NOT commit actual certificates to git!
+

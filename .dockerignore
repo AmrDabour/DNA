@@ -78,5 +78,17 @@ k8s similar/
 # Test data that's not needed
 *.bak
 
+# SSL Certificates (mounted separately)
+nginx/ssl/*.pem
+nginx/ssl/*.crt
+nginx/ssl/*.key
+
+# Development override (production uses base compose only)
+# docker-compose.override.yml  # Uncomment to exclude from builds
+
+# Plans and docs
+*.plan.md
+.cursor/plans/
+
 
 

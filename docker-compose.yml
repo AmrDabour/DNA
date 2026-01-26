@@ -1,10 +1,43 @@
 # ============================================================
 # GenovaAI - Docker Compose Configuration
-# Production-Ready with PostgreSQL 15 Alpine
+# Production-Ready with Nginx, Redis, PostgreSQL, MongoDB
 # ============================================================
-version: '3.8'
 
 services:
+  # ============================================================
+  # Nginx Reverse Proxy
+  # ============================================================
+  nginx:
+    image: nginx:alpine
+    container_name: genovaai-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./web/static:/app/web/static:ro
+      - certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      genovaai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - genovaai-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
   # ============================================================
   # PostgreSQL Database Service
   # ============================================================
@@ -70,6 +103,32 @@ services:
           memory: 256M
 
   # ============================================================
+  # Redis Cache Service
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: genovaai-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - genovaai-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ============================================================
   # Main Flask Application
   # ============================================================
   genovaai:
@@ -82,10 +141,10 @@ services:
     ports:
       - "5001:5001"
     environment:
-      # Flask Configuration
-      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-genetic_prediction_app_secret_key}
-      - FLASK_ENV=${FLASK_ENV:-development}
-      - FLASK_DEBUG=${FLASK_DEBUG:-1}
+      # Flask Configuration - PRODUCTION
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-CHANGE_ME_IN_PRODUCTION}
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
       
       # PostgreSQL Database Configuration
       - DATABASE_URL=postgresql://${POSTGRES_USER:-genovaai_user}:${POSTGRES_PASSWORD:-genovaai_secure_password_2024}@postgres:5432/${POSTGRES_DB:-genovaai}
@@ -102,6 +161,11 @@ services:
       - MONGO_USER=${MONGO_USER:-genovaai_mongo_user}
       - MONGO_PASSWORD=${MONGO_PASSWORD:-genovaai_mongo_password_2024}
       
+      # Redis Configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/0
+      
       # Connection Pool Settings
       - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-20}
@@ -114,19 +178,18 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@genovaai.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      
+      # LangSmith Configuration (Optional)
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-genovaai-production}
+      
+      # Celery/RabbitMQ Configuration
+      - CELERY_ENABLED=true
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-genovaai}:${RABBITMQ_PASSWORD:-genovaai_rabbit_2024}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
     volumes:
-      # Development: Mount source code for live reload (comment out for production)
-      - ./app.py:/app/app.py:ro
-      - ./routes:/app/routes:ro
-      - ./web/templates:/app/web/templates:ro
-      - ./web/static:/app/web/static:ro
-      - ./services:/app/services:ro
-      - ./utils:/app/utils:ro
-      - ./config:/app/config:ro
-      - ./ml_models:/app/ml_models:ro
-      - ./agent:/app/agent:ro
-      - ./scripts:/app/scripts:ro
-      # Persist uploads and results
+      # Production: Only persist data volumes (no source code mounts)
       - genovaai-uploads:/app/uploads
       - genovaai-results:/app/result
       - genovaai-plots:/app/plots
@@ -135,6 +198,10 @@ services:
       postgres:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/"]
@@ -152,24 +219,141 @@ services:
           memory: 1G
 
   # ============================================================
-  # Redis Cache Service (Optional - Uncomment when needed)
+  # RabbitMQ Message Broker
   # ============================================================
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: genovaai-redis
-  #   restart: unless-stopped
-  #   command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis-data:/data
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   networks:
-  #     - genovaai-network
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: genovaai-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-genovaai}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-genovaai_rabbit_2024}
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"      # AMQP protocol
+      - "15672:15672"    # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - genovaai-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # ============================================================
+  # Celery Worker
+  # ============================================================
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: amrdabour/genovaai:${TAG:-latest}
+    container_name: genovaai-celery-worker
+    restart: unless-stopped
+    command: celery -A celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - FLASK_ENV=production
+      - CELERY_ENABLED=true
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-genovaai_user}:${POSTGRES_PASSWORD:-genovaai_secure_password_2024}@postgres:5432/${POSTGRES_DB:-genovaai}
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DB=${MONGO_DB:-genovaai}
+      - MONGO_USER=${MONGO_USER:-genovaai_mongo_user}
+      - MONGO_PASSWORD=${MONGO_PASSWORD:-genovaai_mongo_password_2024}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-genovaai}:${RABBITMQ_PASSWORD:-genovaai_rabbit_2024}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      - genovaai-uploads:/app/uploads
+      - genovaai-results:/app/result
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - genovaai-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ============================================================
+  # Celery Beat Scheduler
+  # ============================================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: amrdabour/genovaai:${TAG:-latest}
+    container_name: genovaai-celery-beat
+    restart: unless-stopped
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      - FLASK_ENV=production
+      - CELERY_ENABLED=true
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-genovaai}:${RABBITMQ_PASSWORD:-genovaai_rabbit_2024}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - genovaai-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ============================================================
+  # Flower - Celery Monitoring Dashboard
+  # ============================================================
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: amrdabour/genovaai:${TAG:-latest}
+    container_name: genovaai-flower
+    restart: unless-stopped
+    command: celery -A celery_app flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower_admin_2024}
+    environment:
+      - CELERY_ENABLED=true
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-genovaai}:${RABBITMQ_PASSWORD:-genovaai_rabbit_2024}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    ports:
+      - "5555:5555"    # Flower monitoring UI
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - genovaai-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
   # ============================================================
   # PgAdmin (Optional - for database management)
@@ -202,6 +386,8 @@ volumes:
     driver: local
   mongodb-config:
     driver: local
+  redis-data:
+    driver: local
   genovaai-uploads:
     driver: local
   genovaai-results:
@@ -210,8 +396,10 @@ volumes:
     driver: local
   genovaai-visualizations:
     driver: local
-  # redis-data:
-  #   driver: local
+  certbot-webroot:
+    driver: local
+  rabbitmq-data:
+    driver: local
   # pgadmin-data:
   #   driver: local
 
@@ -224,4 +412,3 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/16
-

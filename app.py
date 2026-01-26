@@ -25,6 +25,13 @@ from database import db, User, init_db, create_admin_user
 from config import get_database_url, wait_for_database, get_engine_options
 from config.mongodb import wait_for_mongodb, get_snp_collection
 
+# Import Redis configuration (optional)
+try:
+    from config.redis import configure_flask_session, is_redis_available, redis_health_check
+    REDIS_MODULE_AVAILABLE = True
+except ImportError:
+    REDIS_MODULE_AVAILABLE = False
+
 # ============================================================
 # Flask App Setup
 # ============================================================
@@ -35,6 +42,13 @@ app = Flask(__name__,
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY", "genetic_prediction_app_secret_key"
 )
+
+# Configure Flask-Session with Redis (if available)
+if REDIS_MODULE_AVAILABLE:
+    if configure_flask_session(app):
+        print("✅ Flask-Session configured with Redis" if is_redis_available() else "⚠️ Flask-Session using filesystem fallback")
+else:
+    print("⚠️ Redis module not available. Using default cookie sessions.")
 
 # Database configuration - supports both SQLite and PostgreSQL
 database_url = get_database_url()
@@ -339,6 +353,60 @@ def serve_upload(filename):
     """Serve files from the uploads directory (including generated images)"""
     uploads_dir = os.path.join(os.getcwd(), "uploads")
     return send_from_directory(uploads_dir, filename)
+
+
+# ============================================================
+# Health Check Endpoints
+# ============================================================
+
+@app.route("/health")
+def health_check():
+    """Basic health check endpoint"""
+    return {"status": "healthy", "service": "genovaai"}
+
+
+@app.route("/health/detailed")
+def detailed_health_check():
+    """Detailed health check with all services"""
+    from flask import jsonify
+    
+    health = {
+        "status": "healthy",
+        "service": "genovaai",
+        "checks": {}
+    }
+    
+    # Database check
+    try:
+        db.session.execute(db.text("SELECT 1"))
+        health["checks"]["database"] = {"status": "healthy"}
+    except Exception as e:
+        health["checks"]["database"] = {"status": "unhealthy", "error": str(e)}
+        health["status"] = "degraded"
+    
+    # MongoDB check
+    try:
+        from config.mongodb import is_mongodb_available
+        if is_mongodb_available():
+            health["checks"]["mongodb"] = {"status": "healthy"}
+        else:
+            health["checks"]["mongodb"] = {"status": "unhealthy"}
+            health["status"] = "degraded"
+    except Exception as e:
+        health["checks"]["mongodb"] = {"status": "unknown", "error": str(e)}
+    
+    # Redis check
+    if REDIS_MODULE_AVAILABLE:
+        redis_status = redis_health_check()
+        health["checks"]["redis"] = redis_status
+        if redis_status.get("status") != "healthy":
+            # Redis is optional, so only mark as degraded
+            if health["status"] == "healthy":
+                health["status"] = "healthy"  # Redis is optional
+    else:
+        health["checks"]["redis"] = {"status": "not_configured"}
+    
+    return jsonify(health)
 
 
 # ============================================================

@@ -1,0 +1,69 @@
+# ============================================================
+# GenovaAI - Docker Compose Override (Development)
+# ============================================================
+# This file is automatically loaded by docker-compose and overrides
+# settings in docker-compose.yml for local development.
+#
+# Usage:
+#   Development: docker-compose up (auto-loads this file)
+#   Production:  docker-compose -f docker-compose.yml up
+# ============================================================
+
+services:
+  # ============================================================
+  # Flask Application - Development Overrides
+  # ============================================================
+  genovaai:
+    environment:
+      # Development settings
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-dev_secret_key_not_for_production}
+    volumes:
+      # Mount source code for live reload
+      - ./app.py:/app/app.py:ro
+      - ./routes:/app/routes:ro
+      - ./web/templates:/app/web/templates:ro
+      - ./web/static:/app/web/static:ro
+      - ./services:/app/services:ro
+      - ./utils:/app/utils:ro
+      - ./config:/app/config:ro
+      - ./ml_models:/app/ml_models:ro
+      - ./agent:/app/agent:ro
+      - ./scripts:/app/scripts:ro
+      - ./database:/app/database:ro
+      # Persist uploads and results
+      - genovaai-uploads:/app/uploads
+      - genovaai-results:/app/result
+      - genovaai-plots:/app/plots
+      - genovaai-visualizations:/app/visualizations
+    # Override command for development with auto-reload
+    # Uncomment below to use Flask's development server instead of Gunicorn
+    # command: ["python", "app.py"]
+
+  # ============================================================
+  # Nginx - Development Overrides (Optional)
+  # ============================================================
+  # Uncomment to disable Nginx in development and access Flask directly
+  # nginx:
+  #   profiles:
+  #     - production
+
+# ============================================================
+# Development Tips
+# ============================================================
+# 1. Access the app directly at http://localhost:5001 (Flask)
+#    or http://localhost (through Nginx)
+#
+# 2. To skip Nginx in development:
+#    docker-compose up postgres mongodb redis genovaai
+#
+# 3. To run production mode locally:
+#    docker-compose -f docker-compose.yml up
+#
+# 4. View logs:
+#    docker-compose logs -f genovaai
+#
+# 5. Rebuild after dependency changes:
+#    docker-compose build --no-cache genovaai
+

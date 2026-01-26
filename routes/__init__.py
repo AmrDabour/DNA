@@ -32,6 +32,8 @@ from .risk_calculator_routes import risk_calculator_bp
 from .notifications_routes import notifications_bp
 from .pages_routes import pages_bp  # Static pages (Privacy, Terms, Contact)
 from .vep_routes import vep_bp, vep_page_bp  # VEP Analysis routes
+from .admin_routes import admin_bp  # Admin dashboard and management
+from .tasks_routes import tasks_bp  # Celery task management routes
 
 
 def register_blueprints(app):
@@ -57,5 +59,9 @@ def register_blueprints(app):
     app.register_blueprint(pages_bp)  # Static pages (Privacy, Terms, Contact)
     app.register_blueprint(vep_bp)  # VEP API routes
     app.register_blueprint(vep_page_bp)  # VEP page routes
+    app.register_blueprint(admin_bp)  # Admin dashboard and management
+    app.register_blueprint(tasks_bp)  # Celery task management
+    print(f"✅ Admin routes registered: {len([r for r in app.url_map.iter_rules() if 'admin' in str(r)])} routes")
+    print(f"✅ Tasks routes registered: {len([r for r in app.url_map.iter_rules() if 'tasks' in str(r)])} routes")
 
 

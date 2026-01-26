@@ -11,6 +11,14 @@ from datetime import datetime, timedelta
 import requests
 from threading import Lock
 
+# Import Redis cache (optional - graceful degradation)
+try:
+    from config.redis import vep_cache, is_redis_available
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    vep_cache = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,9 +75,18 @@ class VEPService:
         self.cache_ttl_days = int(os.environ.get('VEP_CACHE_TTL', self.DEFAULT_CACHE_TTL_DAYS))
         self.batch_size = int(os.environ.get('VEP_BATCH_SIZE', self.BATCH_LIMIT))
         
-        # In-memory cache for session (DB cache handled separately)
+        # In-memory cache fallback (used when Redis unavailable)
         self._memory_cache: Dict[str, Dict] = {}
         self._cache_lock = Lock()
+        
+        # Cache TTL in seconds for Redis
+        self._cache_ttl_seconds = self.cache_ttl_days * 24 * 3600
+        
+        # Log cache mode
+        if REDIS_AVAILABLE and is_redis_available():
+            logger.info("✅ VEP Service using Redis cache")
+        else:
+            logger.info("⚠️ VEP Service using in-memory cache (Redis unavailable)")
     
     def _make_request(self, method: str, url: str, **kwargs) -> Optional[requests.Response]:
         """Make HTTP request with rate limiting and retry logic"""
@@ -115,7 +132,20 @@ class VEPService:
         return None
     
     def _get_from_cache(self, rs_id: str) -> Optional[Dict]:
-        """Get result from memory cache"""
+        """
+        Get result from cache (Redis first, then in-memory fallback).
+        Returns None if not found or expired.
+        """
+        # Try Redis cache first
+        if REDIS_AVAILABLE and vep_cache:
+            try:
+                cached = vep_cache.get(rs_id)
+                if cached:
+                    return cached
+            except Exception as e:
+                logger.debug(f"Redis cache get error for {rs_id}: {e}")
+        
+        # Fallback to in-memory cache
         with self._cache_lock:
             cached = self._memory_cache.get(rs_id)
             if cached:
@@ -128,7 +158,17 @@ class VEPService:
         return None
     
     def _set_cache(self, rs_id: str, data: Dict):
-        """Set result in memory cache"""
+        """
+        Set result in cache (Redis with TTL, and in-memory fallback).
+        """
+        # Store in Redis cache
+        if REDIS_AVAILABLE and vep_cache:
+            try:
+                vep_cache.set(rs_id, data, ttl=self._cache_ttl_seconds)
+            except Exception as e:
+                logger.debug(f"Redis cache set error for {rs_id}: {e}")
+        
+        # Also store in memory cache (for fast access)
         with self._cache_lock:
             expires_at = datetime.utcnow() + timedelta(days=self.cache_ttl_days)
             self._memory_cache[rs_id] = {
@@ -640,10 +680,31 @@ class VEPService:
         except:
             pass
         
+        # Redis stats
+        redis_available = REDIS_AVAILABLE and is_redis_available() if REDIS_AVAILABLE else False
+        redis_info = {}
+        if redis_available and vep_cache:
+            try:
+                from config.redis import get_redis_client
+                client = get_redis_client()
+                if client:
+                    # Count VEP keys
+                    vep_keys = client.keys("genovaai:vep:*")
+                    redis_info = {
+                        "connected": True,
+                        "vep_cache_entries": len(vep_keys) if vep_keys else 0
+                    }
+            except Exception as e:
+                redis_info = {"connected": False, "error": str(e)}
+        else:
+            redis_info = {"connected": False, "reason": "Redis not available"}
+        
         return {
             "memory_cache_entries": memory_count,
             "db_cache_entries": db_count,
-            "cache_ttl_days": self.cache_ttl_days
+            "redis_cache": redis_info,
+            "cache_ttl_days": self.cache_ttl_days,
+            "cache_backend": "redis" if redis_available else "memory"
         }
     
     def clear_expired_cache(self) -> Dict[str, Any]:

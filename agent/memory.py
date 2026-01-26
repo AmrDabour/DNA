@@ -1,10 +1,25 @@
 """
 Chat Memory Management - Persist conversation history across sessions
+Supports Redis persistence with in-memory fallback
 """
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Import Redis cache (optional - graceful degradation)
+try:
+    from config.redis import memory_cache, is_redis_available
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    memory_cache = None
+
+# Memory TTL in seconds (24 hours)
+MEMORY_TTL_SECONDS = 24 * 3600
 
 
 @dataclass
@@ -35,31 +50,40 @@ class Message:
 
 class ChatMemory:
     """
-    Conversation memory manager with sliding window
+    Conversation memory manager with sliding window.
+    Supports Redis persistence with automatic sync.
     """
     
-    def __init__(self, window_size: int = 20):
+    def __init__(self, window_size: int = 20, session_id: str = None):
         self.window_size = window_size
+        self.session_id = session_id
         self.messages: List[Message] = []
         self.context: Dict = {}  # Store additional context (current file, patient, etc.)
-        
+        self._dirty = False  # Track if memory needs to be saved
+    
     def add_user_message(self, content: str, metadata: Dict = None) -> None:
         """Add a user message to history"""
         msg = Message(role="user", content=content, metadata=metadata or {})
         self.messages.append(msg)
         self._trim_history()
+        self._dirty = True
+        self._save_to_redis()
     
     def add_assistant_message(self, content: str, metadata: Dict = None) -> None:
         """Add an assistant message to history"""
         msg = Message(role="assistant", content=content, metadata=metadata or {})
         self.messages.append(msg)
         self._trim_history()
+        self._dirty = True
+        self._save_to_redis()
     
-    def add_system_message(elf, content: str) -> None:
+    def add_system_message(self, content: str) -> None:
         """Add a system message to history"""
         msg = Message(role="system", content=content)
         self.messages.append(msg)
         self._trim_history()
+        self._dirty = True
+        self._save_to_redis()
     
     def _trim_history(self) -> None:
         """Keep only the last N messages"""
@@ -74,6 +98,42 @@ class ChatMemory:
             else:
                 self.messages = other_msgs[-self.window_size:]
     
+    def _save_to_redis(self) -> bool:
+        """Save memory to Redis if available"""
+        if not self.session_id or not REDIS_AVAILABLE or not memory_cache:
+            return False
+        
+        try:
+            data = self.to_json()
+            memory_cache.set(f"session:{self.session_id}", {
+                "data": data,
+                "window_size": self.window_size,
+                "updated_at": datetime.now().isoformat()
+            }, ttl=MEMORY_TTL_SECONDS)
+            self._dirty = False
+            return True
+        except Exception as e:
+            logger.debug(f"Failed to save memory to Redis: {e}")
+            return False
+    
+    @classmethod
+    def _load_from_redis(cls, session_id: str, window_size: int = 20) -> Optional["ChatMemory"]:
+        """Load memory from Redis if available"""
+        if not REDIS_AVAILABLE or not memory_cache:
+            return None
+        
+        try:
+            cached = memory_cache.get(f"session:{session_id}")
+            if cached and "data" in cached:
+                memory = cls.from_json(cached["data"], window_size=window_size)
+                memory.session_id = session_id
+                memory._dirty = False
+                return memory
+        except Exception as e:
+            logger.debug(f"Failed to load memory from Redis: {e}")
+        
+        return None
+    
     def get_history(self) -> List[Dict]:
         """Get message history as list of dicts"""
         return [msg.to_dict() for msg in self.messages]
@@ -85,6 +145,8 @@ class ChatMemory:
     def set_context(self, key: str, value) -> None:
         """Set context variable"""
         self.context[key] = value
+        self._dirty = True
+        self._save_to_redis()
     
     def get_context(self, key: str, default=None):
         """Get context variable"""
@@ -93,11 +155,15 @@ class ChatMemory:
     def clear_context(self) -> None:
         """Clear all context"""
         self.context = {}
+        self._dirty = True
+        self._save_to_redis()
     
     def clear(self) -> None:
         """Clear all messages and context"""
         self.messages = []
         self.context = {}
+        self._dirty = True
+        self._save_to_redis()
     
     def get_last_user_message(self) -> Optional[str]:
         """Get the last user message content"""
@@ -123,26 +189,77 @@ class ChatMemory:
         return memory
 
 
-# Session-based memory store (one memory per session)
+# Session-based memory store (in-memory fallback)
 _memory_store: Dict[str, ChatMemory] = {}
 
 
 def get_memory(session_id: str, window_size: int = 20) -> ChatMemory:
-    """Get or create memory for a session"""
-    if session_id not in _memory_store:
-        _memory_store[session_id] = ChatMemory(window_size=window_size)
-    return _memory_store[session_id]
+    """
+    Get or create memory for a session.
+    Loads from Redis if available, falls back to in-memory.
+    """
+    # Check in-memory store first
+    if session_id in _memory_store:
+        return _memory_store[session_id]
+    
+    # Try to load from Redis
+    memory = ChatMemory._load_from_redis(session_id, window_size)
+    if memory:
+        _memory_store[session_id] = memory
+        logger.debug(f"Loaded memory for session {session_id} from Redis")
+        return memory
+    
+    # Create new memory
+    memory = ChatMemory(window_size=window_size, session_id=session_id)
+    _memory_store[session_id] = memory
+    return memory
 
 
 def clear_memory(session_id: str) -> None:
-    """Clear memory for a session"""
+    """Clear memory for a session (both in-memory and Redis)"""
     if session_id in _memory_store:
         _memory_store[session_id].clear()
+    
+    # Also clear from Redis
+    if REDIS_AVAILABLE and memory_cache:
+        try:
+            memory_cache.delete(f"session:{session_id}")
+        except Exception as e:
+            logger.debug(f"Failed to clear Redis memory: {e}")
+
+
+def delete_memory(session_id: str) -> None:
+    """Completely delete memory for a session"""
+    if session_id in _memory_store:
+        del _memory_store[session_id]
+    
+    # Also delete from Redis
+    if REDIS_AVAILABLE and memory_cache:
+        try:
+            memory_cache.delete(f"session:{session_id}")
+        except Exception as e:
+            logger.debug(f"Failed to delete Redis memory: {e}")
 
 
 def get_all_sessions() -> List[str]:
-    """Get all active session IDs"""
-    return list(_memory_store.keys())
+    """Get all active session IDs (combines in-memory and Redis)"""
+    sessions = set(_memory_store.keys())
+    
+    # Get sessions from Redis
+    if REDIS_AVAILABLE and memory_cache:
+        try:
+            from config.redis import get_redis_client
+            client = get_redis_client()
+            if client:
+                redis_keys = client.keys("genovaai:memory:session:*")
+                for key in redis_keys:
+                    # Extract session ID from key
+                    session_id = key.replace("genovaai:memory:session:", "")
+                    sessions.add(session_id)
+        except Exception as e:
+            logger.debug(f"Failed to get Redis sessions: {e}")
+    
+    return list(sessions)
 
 
 def cleanup_old_sessions(max_sessions: int = 100) -> int:
@@ -165,8 +282,33 @@ def cleanup_old_sessions(max_sessions: int = 100) -> int:
     to_remove = len(_memory_store) - max_sessions
     removed = 0
     for sid, _ in sessions_with_time[:to_remove]:
-        del _memory_store[sid]
+        delete_memory(sid)
         removed += 1
     
     return removed
 
+
+def get_memory_stats() -> Dict:
+    """Get memory usage statistics"""
+    in_memory_count = len(_memory_store)
+    redis_count = 0
+    redis_available = False
+    
+    if REDIS_AVAILABLE and is_redis_available():
+        redis_available = True
+        try:
+            from config.redis import get_redis_client
+            client = get_redis_client()
+            if client:
+                redis_keys = client.keys("genovaai:memory:session:*")
+                redis_count = len(redis_keys) if redis_keys else 0
+        except:
+            pass
+    
+    return {
+        "in_memory_sessions": in_memory_count,
+        "redis_sessions": redis_count,
+        "redis_available": redis_available,
+        "storage_backend": "redis" if redis_available else "memory",
+        "ttl_seconds": MEMORY_TTL_SECONDS
+    }

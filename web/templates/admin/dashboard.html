@@ -1,0 +1,1024 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - GenovaAI{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --admin-primary: #0f172a;
+        --admin-secondary: #1e293b;
+        --admin-accent: #3b82f6;
+        --admin-accent-light: #60a5fa;
+        --admin-success: #10b981;
+        --admin-warning: #f59e0b;
+        --admin-danger: #ef4444;
+        --admin-text: #f8fafc;
+        --admin-text-muted: #94a3b8;
+        --admin-border: #334155;
+        --glass-bg: rgba(30, 41, 59, 0.8);
+        --glass-border: rgba(148, 163, 184, 0.1);
+    }
+
+    body {
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+        min-height: 100vh;
+    }
+
+    .admin-wrapper {
+        padding: 2rem;
+        max-width: 1800px;
+        margin: 0 auto;
+    }
+
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .admin-title {
+        font-size: 2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #fff 0%, #60a5fa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .admin-subtitle {
+        color: var(--admin-text-muted);
+        font-size: 0.95rem;
+        margin-top: 0.25rem;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .btn-admin {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-admin-primary {
+        background: linear-gradient(135deg, var(--admin-accent) 0%, #6366f1 100%);
+        color: white;
+    }
+
+    .btn-admin-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-admin-outline {
+        background: transparent;
+        border: 1px solid var(--admin-border);
+        color: var(--admin-text);
+    }
+
+    .btn-admin-outline:hover {
+        background: var(--glass-bg);
+        border-color: var(--admin-accent);
+    }
+
+    .btn-admin-danger {
+        background: linear-gradient(135deg, var(--admin-danger) 0%, #dc2626 100%);
+        color: white;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--admin-accent);
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.15);
+    }
+
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .stat-icon.blue { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); }
+    .stat-icon.green { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .stat-icon.orange { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    .stat-icon.red { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .stat-icon.purple { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+    .stat-icon.cyan { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+
+    .stat-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .stat-badge.healthy { background: rgba(16, 185, 129, 0.2); color: var(--admin-success); }
+    .stat-badge.warning { background: rgba(245, 158, 11, 0.2); color: var(--admin-warning); }
+    .stat-badge.error { background: rgba(239, 68, 68, 0.2); color: var(--admin-danger); }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--admin-text);
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: var(--admin-text-muted);
+        font-size: 0.9rem;
+    }
+
+    .stat-change {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+    }
+
+    .stat-change.positive { color: var(--admin-success); }
+    .stat-change.negative { color: var(--admin-danger); }
+
+    /* Dashboard Grid */
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 1.5rem;
+    }
+
+    .card {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .card-full { grid-column: span 12; }
+    .card-half { grid-column: span 6; }
+    .card-third { grid-column: span 4; }
+    .card-two-thirds { grid-column: span 8; }
+
+    @media (max-width: 1200px) {
+        .card-half, .card-third, .card-two-thirds { grid-column: span 12; }
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--admin-text);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .card-title i {
+        color: var(--admin-accent);
+    }
+
+    /* Services Grid */
+    .services-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .service-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 0.75rem;
+        border: 1px solid var(--glass-border);
+        transition: all 0.2s;
+    }
+
+    .service-item:hover {
+        border-color: var(--admin-accent);
+    }
+
+    .service-status {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .service-status.green { background: var(--admin-success); box-shadow: 0 0 10px var(--admin-success); }
+    .service-status.yellow { background: var(--admin-warning); box-shadow: 0 0 10px var(--admin-warning); }
+    .service-status.red { background: var(--admin-danger); box-shadow: 0 0 10px var(--admin-danger); }
+
+    .service-info h4 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--admin-text);
+        margin-bottom: 0.25rem;
+    }
+
+    .service-info p {
+        font-size: 0.8rem;
+        color: var(--admin-text-muted);
+        margin: 0;
+    }
+
+    /* Cache Stats */
+    .cache-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    .cache-stat {
+        text-align: center;
+        padding: 1.5rem;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 0.75rem;
+        border: 1px solid var(--glass-border);
+    }
+
+    .cache-stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--admin-accent);
+        margin-bottom: 0.25rem;
+    }
+
+    .cache-stat-label {
+        font-size: 0.85rem;
+        color: var(--admin-text-muted);
+    }
+
+    /* Progress Bar */
+    .progress-container {
+        margin-top: 1rem;
+    }
+
+    .progress-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .progress-bar {
+        height: 8px;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 9999px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        border-radius: 9999px;
+        transition: width 0.5s ease;
+    }
+
+    .progress-fill.blue { background: linear-gradient(90deg, var(--admin-accent) 0%, #6366f1 100%); }
+    .progress-fill.green { background: linear-gradient(90deg, var(--admin-success) 0%, #059669 100%); }
+    .progress-fill.orange { background: linear-gradient(90deg, var(--admin-warning) 0%, #d97706 100%); }
+    .progress-fill.red { background: linear-gradient(90deg, var(--admin-danger) 0%, #dc2626 100%); }
+
+    /* Users Table */
+    .users-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .users-table th {
+        text-align: left;
+        padding: 1rem;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--admin-text-muted);
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .users-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--glass-border);
+        color: var(--admin-text);
+    }
+
+    .users-table tr:hover td {
+        background: rgba(59, 130, 246, 0.05);
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .user-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--admin-accent) 0%, #6366f1 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .user-name {
+        font-weight: 500;
+    }
+
+    .user-email {
+        font-size: 0.85rem;
+        color: var(--admin-text-muted);
+    }
+
+    .badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .badge-admin { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+    .badge-user { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .badge-active { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .badge-inactive { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+    /* Actions */
+    .action-btn {
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        background: transparent;
+        border: none;
+        color: var(--admin-text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+        background: var(--glass-bg);
+        color: var(--admin-accent);
+    }
+
+    .action-btn.danger:hover {
+        color: var(--admin-danger);
+    }
+
+    /* Cache Actions */
+    .cache-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--glass-border);
+    }
+
+    .cache-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.85rem;
+        border: 1px solid var(--glass-border);
+        background: transparent;
+        color: var(--admin-text);
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .cache-btn:hover {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: var(--admin-danger);
+        color: var(--admin-danger);
+    }
+
+    .cache-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Toast */
+    .toast-container {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 9999;
+    }
+
+    .toast {
+        padding: 1rem 1.5rem;
+        border-radius: 0.75rem;
+        background: var(--admin-secondary);
+        border: 1px solid var(--glass-border);
+        color: var(--admin-text);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        margin-top: 0.5rem;
+        animation: slideIn 0.3s ease;
+    }
+
+    .toast.success { border-left: 4px solid var(--admin-success); }
+    .toast.error { border-left: 4px solid var(--admin-danger); }
+    .toast.warning { border-left: 4px solid var(--admin-warning); }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* System Resources */
+    .resources-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .resources-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .resource-item {
+        text-align: center;
+    }
+
+    .resource-circle {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 1rem;
+        position: relative;
+    }
+
+    .resource-circle svg {
+        transform: rotate(-90deg);
+    }
+
+    .resource-circle .bg {
+        stroke: rgba(255, 255, 255, 0.1);
+    }
+
+    .resource-circle .progress {
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .resource-value {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--admin-text);
+    }
+
+    .resource-label {
+        font-size: 0.9rem;
+        color: var(--admin-text-muted);
+    }
+
+    /* Loading Spinner */
+    .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid var(--glass-border);
+        border-top-color: var(--admin-accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Recent Activity */
+    .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .activity-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 0.75rem;
+        border: 1px solid var(--glass-border);
+    }
+
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+
+    .activity-content {
+        flex: 1;
+    }
+
+    .activity-title {
+        font-weight: 500;
+        color: var(--admin-text);
+        margin-bottom: 0.25rem;
+    }
+
+    .activity-desc {
+        font-size: 0.85rem;
+        color: var(--admin-text-muted);
+    }
+
+    .activity-time {
+        font-size: 0.8rem;
+        color: var(--admin-text-muted);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-wrapper">
+    <!-- Header -->
+    <div class="admin-header">
+        <div>
+            <h1 class="admin-title">
+                <i class="fas fa-shield-alt"></i> Admin Dashboard
+            </h1>
+            <p class="admin-subtitle">System overview and management</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('admin.users_page') }}" class="btn-admin btn-admin-outline">
+                <i class="fas fa-users"></i> Manage Users
+            </a>
+            <button class="btn-admin btn-admin-primary" onclick="refreshStats()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon blue">
+                    <i class="fas fa-users"></i>
+                </div>
+                <span class="stat-badge healthy">Active</span>
+            </div>
+            <div class="stat-value" id="stat-users">{{ stats.users.total }}</div>
+            <div class="stat-label">Total Users</div>
+            <div class="stat-change positive">
+                <i class="fas fa-arrow-up"></i>
+                {{ stats.users.admins }} admins
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon green">
+                    <i class="fas fa-dna"></i>
+                </div>
+                <span class="stat-badge healthy">{{ stats.analyses.success_rate }}%</span>
+            </div>
+            <div class="stat-value" id="stat-analyses">{{ stats.analyses.total }}</div>
+            <div class="stat-label">Total Analyses</div>
+            <div class="stat-change positive">
+                <i class="fas fa-arrow-up"></i>
+                {{ stats.analyses.today }} today
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon purple">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <span class="stat-badge {% if stats.cache.server.hit_rate > 50 %}healthy{% else %}warning{% endif %}">
+                    {{ stats.cache.server.hit_rate }}%
+                </span>
+            </div>
+            <div class="stat-value" id="stat-hit-rate">{{ stats.cache.server.hit_rate }}%</div>
+            <div class="stat-label">Cache Hit Rate</div>
+            <div class="stat-change positive">
+                <i class="fas fa-server"></i>
+                {{ stats.cache.server.hits }} hits
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon cyan">
+                    <i class="fas fa-database"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="stat-storage">{{ stats.storage.total_mb }} MB</div>
+            <div class="stat-label">Storage Used</div>
+            <div class="stat-change">
+                <i class="fas fa-file"></i>
+                {{ stats.storage.uploads.count + stats.storage.results.count }} files
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+        <!-- System Health -->
+        <div class="card card-half">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-heartbeat"></i> System Health
+                </h2>
+                <span class="stat-badge {% if stats.system.status == 'healthy' %}healthy{% else %}warning{% endif %}">
+                    {{ stats.system.status | capitalize }}
+                </span>
+            </div>
+            <div class="services-grid" id="services-grid">
+                {% for name, service in stats.system.services.items() %}
+                <div class="service-item">
+                    <div class="service-status {{ service.color }}"></div>
+                    <div class="service-info">
+                        <h4>{{ name | capitalize }}</h4>
+                        <p>
+                            {% if service.status == 'healthy' %}
+                                Online
+                                {% if service.version %} v{{ service.version }}{% endif %}
+                            {% elif service.status == 'configured' %}
+                                Configured
+                            {% elif service.status == 'unavailable' %}
+                                Not available
+                            {% else %}
+                                {{ service.status | capitalize }}
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if stats.system.system_resources %}
+            <div class="resources-grid" style="margin-top: 1.5rem;">
+                <div class="resource-item">
+                    <div class="resource-circle">
+                        <svg width="100" height="100" viewBox="0 0 100 100">
+                            <circle class="bg" cx="50" cy="50" r="40" fill="none" stroke-width="8"/>
+                            <circle class="progress" cx="50" cy="50" r="40" fill="none" stroke-width="8"
+                                stroke="{% if stats.system.system_resources.cpu_percent > 80 %}var(--admin-danger){% elif stats.system.system_resources.cpu_percent > 60 %}var(--admin-warning){% else %}var(--admin-success){% endif %}"
+                                stroke-dasharray="251.2"
+                                stroke-dashoffset="{{ 251.2 - (251.2 * stats.system.system_resources.cpu_percent / 100) }}"/>
+                        </svg>
+                        <div class="resource-value">{{ stats.system.system_resources.cpu_percent }}%</div>
+                    </div>
+                    <div class="resource-label">CPU Usage</div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-circle">
+                        <svg width="100" height="100" viewBox="0 0 100 100">
+                            <circle class="bg" cx="50" cy="50" r="40" fill="none" stroke-width="8"/>
+                            <circle class="progress" cx="50" cy="50" r="40" fill="none" stroke-width="8"
+                                stroke="{% if stats.system.system_resources.memory_percent > 80 %}var(--admin-danger){% elif stats.system.system_resources.memory_percent > 60 %}var(--admin-warning){% else %}var(--admin-accent){% endif %}"
+                                stroke-dasharray="251.2"
+                                stroke-dashoffset="{{ 251.2 - (251.2 * stats.system.system_resources.memory_percent / 100) }}"/>
+                        </svg>
+                        <div class="resource-value">{{ stats.system.system_resources.memory_percent }}%</div>
+                    </div>
+                    <div class="resource-label">Memory ({{ stats.system.system_resources.memory_used_gb }}GB)</div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-circle">
+                        <svg width="100" height="100" viewBox="0 0 100 100">
+                            <circle class="bg" cx="50" cy="50" r="40" fill="none" stroke-width="8"/>
+                            <circle class="progress" cx="50" cy="50" r="40" fill="none" stroke-width="8"
+                                stroke="{% if stats.system.system_resources.disk_percent > 80 %}var(--admin-danger){% elif stats.system.system_resources.disk_percent > 60 %}var(--admin-warning){% else %}#8b5cf6{% endif %}"
+                                stroke-dasharray="251.2"
+                                stroke-dashoffset="{{ 251.2 - (251.2 * stats.system.system_resources.disk_percent / 100) }}"/>
+                        </svg>
+                        <div class="resource-value">{{ stats.system.system_resources.disk_percent }}%</div>
+                    </div>
+                    <div class="resource-label">Disk Usage</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Cache Statistics -->
+        <div class="card card-half">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-memory"></i> Redis Cache
+                </h2>
+                {% if stats.cache.available %}
+                <span class="stat-badge healthy">Connected</span>
+                {% else %}
+                <span class="stat-badge warning">Unavailable</span>
+                {% endif %}
+            </div>
+
+            {% if stats.cache.available %}
+            <div class="cache-stats">
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.cache.vep.entries }}</div>
+                    <div class="cache-stat-label">VEP Cache</div>
+                </div>
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.cache.memory.entries }}</div>
+                    <div class="cache-stat-label">Chat Memory</div>
+                </div>
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.cache.sessions.entries }}</div>
+                    <div class="cache-stat-label">Sessions</div>
+                </div>
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.cache.server.memory_used_mb }} MB</div>
+                    <div class="cache-stat-label">Memory Used</div>
+                </div>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span>Hit Rate</span>
+                    <span>{{ stats.cache.server.hits }} hits / {{ stats.cache.server.misses }} misses</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill {% if stats.cache.server.hit_rate > 70 %}green{% elif stats.cache.server.hit_rate > 40 %}orange{% else %}red{% endif %}"
+                         style="width: {{ stats.cache.server.hit_rate }}%"></div>
+                </div>
+            </div>
+
+            <div class="cache-actions">
+                <button class="cache-btn" onclick="clearCache('vep')" id="clear-vep-btn">
+                    <i class="fas fa-eraser"></i> Clear VEP Cache
+                </button>
+                <button class="cache-btn" onclick="clearCache('memory')" id="clear-memory-btn">
+                    <i class="fas fa-eraser"></i> Clear Memory
+                </button>
+                <button class="cache-btn" onclick="clearCache('sessions')" id="clear-sessions-btn">
+                    <i class="fas fa-eraser"></i> Clear Sessions
+                </button>
+                <button class="cache-btn" onclick="clearCache('all')" id="clear-all-btn" style="border-color: var(--admin-danger);">
+                    <i class="fas fa-trash"></i> Clear All
+                </button>
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
+                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem; color: var(--admin-warning);"></i>
+                <p>Redis is not available. Caching is disabled.</p>
+                <p style="font-size: 0.85rem;">Check your Redis connection settings.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Recent Users -->
+        <div class="card card-two-thirds">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-user-clock"></i> Recent Users
+                </h2>
+                <a href="{{ url_for('admin.users_page') }}" class="btn-admin btn-admin-outline" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                    View All
+                </a>
+            </div>
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Analyses</th>
+                        <th>Joined</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in stats.users.recent %}
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">{{ user.username[0] | upper }}</div>
+                                <div>
+                                    <div class="user-name">{{ user.username }}</div>
+                                    <div class="user-email">{{ user.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge {% if user.is_admin %}badge-admin{% else %}badge-user{% endif %}">
+                                {% if user.is_admin %}Admin{% else %}User{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-active">Active</span>
+                        </td>
+                        <td>{{ user.analysis_count }}</td>
+                        <td>{{ user.created_at[:10] if user.created_at else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Top Users -->
+        <div class="card card-third">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-trophy"></i> Top Users
+                </h2>
+            </div>
+            <div class="activity-list">
+                {% for user in stats.users.top_users %}
+                <div class="activity-item">
+                    <div class="activity-icon blue">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">{{ user.username }}</div>
+                        <div class="activity-desc">{{ user.email }}</div>
+                    </div>
+                    <div class="activity-time">
+                        <strong>{{ user.analyses }}</strong> analyses
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Analysis Types -->
+        <div class="card card-half">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-chart-pie"></i> Analysis Breakdown
+                </h2>
+            </div>
+            <div class="cache-stats">
+                {% for type, count in stats.analyses.by_type.items() %}
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ count }}</div>
+                    <div class="cache-stat-label">{{ type | capitalize }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="progress-container" style="margin-top: 1.5rem;">
+                <div class="progress-label">
+                    <span>Success Rate</span>
+                    <span>{{ stats.analyses.completed }} / {{ stats.analyses.total }}</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill green" style="width: {{ stats.analyses.success_rate }}%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage -->
+        <div class="card card-half">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-hdd"></i> Storage Overview
+                </h2>
+            </div>
+            <div class="cache-stats">
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.storage.uploads.count }}</div>
+                    <div class="cache-stat-label">Uploaded Files</div>
+                </div>
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.storage.uploads.size_mb }} MB</div>
+                    <div class="cache-stat-label">Uploads Size</div>
+                </div>
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.storage.results.count }}</div>
+                    <div class="cache-stat-label">Result Files</div>
+                </div>
+                <div class="cache-stat">
+                    <div class="cache-stat-value">{{ stats.storage.results.size_mb }} MB</div>
+                    <div class="cache-stat-label">Results Size</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+    // Show toast notification
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    // Clear cache
+    async function clearCache(type) {
+        const btn = document.getElementById(`clear-${type}-btn`);
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<div class="spinner"></div> Clearing...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(`/admin/api/cache/clear/${type}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(data.message, 'success');
+                // Refresh stats after clearing cache
+                setTimeout(refreshStats, 500);
+            } else {
+                showToast(data.error || 'Failed to clear cache', 'error');
+            }
+        } catch (error) {
+            showToast('Error clearing cache', 'error');
+        } finally {
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        }
+    }
+
+    // Refresh stats
+    async function refreshStats() {
+        try {
+            const response = await fetch('/admin/api/stats');
+            const stats = await response.json();
+            
+            // Update stat values
+            document.getElementById('stat-users').textContent = stats.users.total;
+            document.getElementById('stat-analyses').textContent = stats.analyses.total;
+            document.getElementById('stat-hit-rate').textContent = stats.cache.server.hit_rate + '%';
+            document.getElementById('stat-storage').textContent = stats.storage.total_mb + ' MB';
+            
+            showToast('Stats refreshed', 'success');
+        } catch (error) {
+            showToast('Error refreshing stats', 'error');
+        }
+    }
+
+    // Auto-refresh every 30 seconds
+    setInterval(refreshStats, 30000);
+</script>
+{% endblock %}
+
