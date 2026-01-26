@@ -132,7 +132,7 @@ terraform init
 terraform plan -var="gcp_project_id=YOUR_PROJECT_ID"
 
 # Apply (creates cluster and deploys everything)
-terraform apply -var="gcp_project_id=YOUR_PROJECT_ID"
+terraform apply -var="gcp_project_id=YOUR_PROJECT_ID" -auto-approve
 ```
 
 ### Option 2: Using GitHub Actions
