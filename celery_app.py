@@ -242,3 +242,4 @@ if __name__ == '__main__':
     else:
         print("Celery is not enabled. Set CELERY_ENABLED=true to activate.")
 
+

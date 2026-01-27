@@ -162,3 +162,4 @@ def analyze_snp_file(file_path: str, **kwargs) -> Dict[str, Any]:
     else:
         return analyze_snp_file_task(file_path, **kwargs)
 
+

@@ -323,7 +323,8 @@ def upload_file():
             if is_ped_file:
                 try:
                     file_path = convert_ped_to_csv(file_path)
-                    flash("PED file converted to CSV format successfully", "success")
+                    # flash("PED file converted to CSV format successfully", "success")
+                    pass
                 except Exception as e:
                     flash(f"Error converting PED file: {str(e)}. Trying to read as CSV format.", "warning")
             

@@ -394,3 +394,4 @@ def configure_flask_session(app):
         logger.error(f"❌ Error configuring Flask-Session: {e}")
         return False
 
+

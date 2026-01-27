@@ -87,9 +87,6 @@
                                         <h6 class="file-name-display" id="selected-filename">Filename.csv</h6>
                                         <span class="file-size-display" id="selected-filesize">0 KB</span>
                                     </div>
-                                    <button type="button" class="btn-remove-file" id="remove-file-btn">
-                                        <i class="fas fa-times"></i>
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -759,17 +756,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const dropzoneSelected = document.getElementById('dropzone-selected');
     const selectedFilename = document.getElementById('selected-filename');
     const selectedFilesize = document.getElementById('selected-filesize');
-    const removeFileBtn = document.getElementById('remove-file-btn');
     const analyzeBtn = document.getElementById('analyze-btn');
     const snpLimitInput = document.getElementById('snp-limit');
     
-    // Click to browse
+    // Click to browse - only when placeholder is visible
     browseBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         fileInput.click();
     });
     
-    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('click', (e) => {
+        // Only trigger file input if the placeholder is visible
+        if (dropzonePlaceholder.style.display !== 'none') {
+            fileInput.click();
+        }
+    });
     
     // Drag & drop handlers
     ['dragenter', 'dragover'].forEach(eventName => {
@@ -829,15 +830,6 @@ document.addEventListener('DOMContentLoaded', function() {
         dt.items.add(file);
         fileInput.files = dt.files;
     }
-    
-    // Remove file
-    removeFileBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fileInput.value = '';
-        dropzonePlaceholder.style.display = 'block';
-        dropzoneSelected.style.display = 'none';
-        analyzeBtn.disabled = true;
-    });
     
     // Format file size
     function formatFileSize(bytes) {

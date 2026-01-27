@@ -383,19 +383,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileIcon = filePreview.querySelector('.file-icon i');
         if (fileExt === 'ped') {
             fileIcon.className = 'fas fa-file-alt';
-            // Add a note about conversion
-            let conversionNote = filePreview.querySelector('.conversion-note');
-            if (!conversionNote) {
-                conversionNote = document.createElement('small');
-                conversionNote.className = 'conversion-note text-muted d-block mt-2';
-                conversionNote.innerHTML = '<i class="fas fa-info-circle me-1"></i>PED file will be automatically converted to CSV format';
-                filePreview.querySelector('.file-info').appendChild(conversionNote);
-            }
         } else {
             fileIcon.className = 'fas fa-file-csv';
-            // Remove conversion note if exists
-            const conversionNote = filePreview.querySelector('.conversion-note');
-            if (conversionNote) conversionNote.remove();
         }
         
         dropZone.style.display = 'none';

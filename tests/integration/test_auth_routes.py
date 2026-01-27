@@ -298,3 +298,4 @@ class TestAuthAPIEndpoints:
         assert data['username'] == 'testuser'
         assert data['email'] == 'testuser@example.com'
 
+

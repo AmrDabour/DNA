@@ -31,3 +31,4 @@ proxy_busy_buffers_size 8k;
 proxy_intercept_errors off;
 proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
 
+

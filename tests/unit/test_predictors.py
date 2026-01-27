@@ -373,3 +373,4 @@ class TestModelIntegration:
             assert hasattr(predictor.ancestry_predictor, 'model')
             assert hasattr(predictor.ancestry_predictor, 'known_populations')
 
+

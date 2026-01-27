@@ -430,3 +430,4 @@ class TestGeneticRiskProfileModel:
         assert len(retrieved_factors) == 2
         assert 'APOE ε2 allele' in retrieved_factors
 
+
