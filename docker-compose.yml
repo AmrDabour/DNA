@@ -209,6 +209,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    # Run SNP database initialization before starting the application
+    command: >
+      sh -c "python scripts/seed_snp_database.py && 
+             gunicorn --bind 0.0.0.0:5001 --workers 2 --threads 4 --timeout 120 app:app"
     networks:
       - genovaai-network
     deploy:

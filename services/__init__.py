@@ -268,4 +268,87 @@ Rules:
         return {"success": False, "error": str(e)}
 
 
-__all__ = ['configure_gemini', 'get_physical_characteristics', 'get_genetic_disease_risk', 'POPULATION_INFO']
+def get_ai_health_guidance(diseases, gender, population):
+    """
+    Get personalized health guidance based on disease risks.
+    
+    Args:
+        diseases: List of disease risk objects
+        gender: Gender of the person
+        population: Population/Ancestry code
+        
+    Returns:
+        dict with success status and guidance data
+    """
+    try:
+        import google.generativeai as genai
+        import json
+        
+        api_key = os.environ.get('GEMINI_API_KEY')
+        model_name = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+        
+        if not api_key:
+            return {"success": False, "error": "Gemini API key not configured"}
+            
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name=model_name)
+        
+        disease_names = ", ".join([d.get('name', 'Unknown') for d in diseases])
+        
+        prompt = f"""You are a personalized health and wellness advisor. 
+Based on these genetic disease risks for a {gender} individual from the {population} population:
+Risks identified: {disease_names}
+
+Provide actionable, personalized health guidance in the following categories:
+1. Nutrition & Diet (specific foods to include/avoid)
+2. Lifestyle & Exercise (types of activity, habits)
+3. Preventive Screenings (specific tests or checkups to consider)
+4. Wellness Tips (stress management, sleep, supplements if relevant)
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{{
+    "guidance": {{
+        "nutrition": ["tip 1", "tip 2", "tip 3"],
+        "lifestyle": ["tip 1", "tip 2", "tip 3"],
+        "screenings": ["tip 1", "tip 2", "tip 3"],
+        "wellness": ["tip 1", "tip 2", "tip 3"]
+    }},
+    "summary": "Full overview sentence"
+}}
+
+Rules:
+- Provide 3-4 specific, high-quality tips per category
+- Tailor advice to the specific risks mentioned: {disease_names}
+- Maintain a professional, encouraging tone
+- Include a 1-sentence summary at the end"""
+
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean up markdown code blocks if present
+        if "```" in response_text:
+            parts = response_text.split("```")
+            for part in parts:
+                part = part.strip()
+                if part.startswith("json"):
+                    part = part[4:].strip()
+                if part.startswith("{"):
+                    response_text = part
+                    break
+        
+        try:
+            guidance_data = json.loads(response_text)
+            return {
+                "success": True,
+                "guidance": guidance_data.get("guidance", {}),
+                "summary": guidance_data.get("summary", "")
+            }
+        except json.JSONDecodeError as e:
+            print(f"⚠️ Guidance JSON parse error: {e}")
+            return {"success": False, "error": "Could not parse AI response"}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+__all__ = ['configure_gemini', 'get_physical_characteristics', 'get_genetic_disease_risk', 'get_ai_health_guidance', 'POPULATION_INFO']

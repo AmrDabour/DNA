@@ -312,6 +312,14 @@ def view_analysis(analysis_id):
         else:
             print(f"⚠️ Image file not found: {full_image_path}")
     
+    # Get user info for PDF report
+    user_info = None
+    if current_user.is_authenticated:
+        user_info = {
+            'name': current_user.username,
+            'email': getattr(current_user, 'email', None)
+        }
+    
     return render_template(
         'prediction_results.html',
         sample_id=analysis.sample_id,
@@ -322,7 +330,8 @@ def view_analysis(analysis_id):
         generated_image=generated_image,
         raw_snp_prediction=bool(full_results),
         from_history=True,
-        analysis_id=analysis_id
+        analysis_id=analysis_id,
+        user_info=user_info
     )
 
 
@@ -360,3 +369,216 @@ def save_analysis_to_history(sample_id, results, full_results=None, file_name=No
     db.session.commit()
     
     return analysis
+
+
+# ============================================================================
+# PDF Report Generation Endpoints
+# ============================================================================
+
+@history_bp.route('/api/reports/<int:analysis_id>/pdf')
+def generate_pdf_report(analysis_id):
+    """
+    Generate a professional PDF medical report for an analysis
+    
+    Args:
+        analysis_id: The ID of the analysis to generate report for
+        
+    Returns:
+        PDF file download or JSON error
+    """
+    from flask import send_file, make_response
+    from database import db, AnalysisHistory
+    from services.pdf_service import generate_medical_report, get_report_filename
+    
+    # Get the analysis
+    analysis = AnalysisHistory.query.get_or_404(analysis_id)
+    
+    # Check access permissions
+    if current_user.is_authenticated:
+        # User can access their own analyses or public ones
+        if analysis.user_id and analysis.user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    # Prepare analysis data
+    analysis_data = analysis.to_dict()
+    analysis_data['full_results'] = analysis.get_full_results()
+    
+    # Prepare user info
+    user_info = {}
+    if current_user.is_authenticated:
+        user_info = {
+            'name': current_user.full_name or current_user.username,
+            'email': current_user.email
+        }
+    elif analysis.user_id:
+        # Try to get user info from the analysis owner
+        from database import User
+        user = User.query.get(analysis.user_id)
+        if user:
+            user_info = {
+                'name': user.full_name or user.username,
+                'email': user.email
+            }
+    
+    # Generate PDF filename
+    filename = get_report_filename(analysis.sample_id, analysis_id)
+    
+    # Define save path for caching
+    reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'reports')
+    save_path = os.path.join(reports_dir, filename)
+    
+    # Check if cached report exists and is recent (less than 1 hour old)
+    use_cached = False
+    if os.path.exists(save_path):
+        file_age = datetime.now().timestamp() - os.path.getmtime(save_path)
+        if file_age < 3600:  # 1 hour cache
+            use_cached = True
+    
+    try:
+        if use_cached:
+            # Return cached file
+            return send_file(
+                save_path,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=filename
+            )
+        else:
+            # Generate new PDF
+            pdf_buffer, filepath = generate_medical_report(
+                analysis_data=analysis_data,
+                user_info=user_info,
+                save_path=save_path
+            )
+            
+            # Return the file
+            return send_file(
+                filepath,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=filename
+            )
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'error': f'Failed to generate PDF report: {str(e)}'
+        }), 500
+
+
+@history_bp.route('/api/reports/<int:analysis_id>/pdf/preview')
+def preview_pdf_report(analysis_id):
+    """
+    Generate and return PDF for inline preview (not download)
+    """
+    from flask import send_file
+    from database import db, AnalysisHistory
+    from services.pdf_service import generate_medical_report, get_report_filename
+    
+    analysis = AnalysisHistory.query.get_or_404(analysis_id)
+    
+    # Check access permissions
+    if current_user.is_authenticated:
+        if analysis.user_id and analysis.user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    # Prepare data
+    analysis_data = analysis.to_dict()
+    analysis_data['full_results'] = analysis.get_full_results()
+    
+    user_info = {}
+    if current_user.is_authenticated:
+        user_info = {
+            'name': current_user.full_name or current_user.username,
+            'email': current_user.email
+        }
+    
+    try:
+        pdf_buffer, _ = generate_medical_report(
+            analysis_data=analysis_data,
+            user_info=user_info,
+            save_path=None  # Don't save, just return buffer
+        )
+        
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=False,  # Inline display
+            download_name=get_report_filename(analysis.sample_id, analysis_id)
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'error': f'Failed to generate PDF preview: {str(e)}'
+        }), 500
+
+
+@history_bp.route('/api/reports/sample/<sample_id>/pdf')
+def generate_pdf_by_sample(sample_id):
+    """
+    Generate PDF report for the most recent analysis of a sample
+    
+    Args:
+        sample_id: The sample ID to generate report for
+        
+    Returns:
+        PDF file download or JSON error
+    """
+    from flask import send_file
+    from database import db, AnalysisHistory
+    from services.pdf_service import generate_medical_report, get_report_filename
+    
+    # Find the most recent analysis for this sample
+    query = AnalysisHistory.query.filter_by(sample_id=sample_id)
+    
+    if current_user.is_authenticated:
+        query = query.filter(
+            or_(AnalysisHistory.user_id == current_user.id, AnalysisHistory.user_id == None)
+        )
+    
+    analysis = query.order_by(desc(AnalysisHistory.created_at)).first()
+    
+    if not analysis:
+        return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+    
+    # Prepare data
+    analysis_data = analysis.to_dict()
+    analysis_data['full_results'] = analysis.get_full_results()
+    
+    user_info = {}
+    if current_user.is_authenticated:
+        user_info = {
+            'name': current_user.full_name or current_user.username,
+            'email': current_user.email
+        }
+    
+    filename = get_report_filename(sample_id, analysis.id)
+    reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'reports')
+    save_path = os.path.join(reports_dir, filename)
+    
+    try:
+        pdf_buffer, filepath = generate_medical_report(
+            analysis_data=analysis_data,
+            user_info=user_info,
+            save_path=save_path
+        )
+        
+        return send_file(
+            filepath,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'error': f'Failed to generate PDF report: {str(e)}'
+        }), 500

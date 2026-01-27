@@ -612,13 +612,27 @@ def seed_snp_database():
         existing_count = collection.count_documents({})
         if existing_count > 0:
             print(f"⚠️  Database already contains {existing_count} SNPs.")
-            response = input("Do you want to clear and reseed? (yes/no): ").strip().lower()
-            if response == 'yes':
+            
+            # Check for non-interactive mode
+            force_reseed = os.environ.get('FORCE_RESEED', 'false').lower() == 'true'
+            
+            if force_reseed:
                 collection.delete_many({})
-                print("🗑️  Cleared existing SNPs.")
+                print("🗑️  Cleared existing SNPs (FORCE_RESEED=true).")
             else:
-                print("ℹ️  Skipping seed. Database already populated.")
-                return True
+                # In non-interactive environments (Docker), we shouldn't ask for input
+                is_docker = os.path.exists('/.dockerenv')
+                if is_docker:
+                    print("ℹ️  Running in Docker. Skipping seed to prevent blocking.")
+                    return True
+                
+                response = input("Do you want to clear and reseed? (yes/no): ").strip().lower()
+                if response == 'yes':
+                    collection.delete_many({})
+                    print("🗑️  Cleared existing SNPs.")
+                else:
+                    print("ℹ️  Skipping seed. Database already populated.")
+                    return True
         
         # Convert dictionary to list of documents
         snp_documents = []

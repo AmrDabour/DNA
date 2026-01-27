@@ -15,7 +15,7 @@ from sqlalchemy import or_
 # Import utilities
 try:
     from utils import convert_to_serializable
-    from services import get_physical_characteristics, get_genetic_disease_risk
+    from services import get_physical_characteristics, get_genetic_disease_risk, get_ai_health_guidance
 except ImportError:
     # Fallback if not available
     def convert_to_serializable(obj):
@@ -33,6 +33,7 @@ except ImportError:
         return obj
     get_physical_characteristics = None
     get_genetic_disease_risk = None
+    get_ai_health_guidance = None
 
 # Create page blueprint (no prefix for page routes)
 predictions_page_bp = Blueprint('predictions_pages', __name__)
@@ -1321,6 +1322,14 @@ def predict():
                     prediction_results["gender"], prediction_results["ancestry"]
                 )
 
+        # Get user info for PDF report
+        user_info = None
+        if current_user.is_authenticated:
+            user_info = {
+                'name': current_user.username,
+                'email': getattr(current_user, 'email', None)
+            }
+
         return render_template(
             "prediction_results.html",
             results=prediction_results,
@@ -1328,6 +1337,7 @@ def predict():
             gender_loaded=gender_loaded,
             ancestry_loaded=ancestry_loaded,
             gemini_prediction=gemini_prediction,
+            user_info=user_info,
         )
 
     except Exception as e:
@@ -1435,6 +1445,14 @@ def show_prediction_results(patient_id):
                 display_results["ancestry"]["description"] = POPULATION_INFO[predicted_pop]["description"]
                 display_results["ancestry"]["code"] = POPULATION_INFO[predicted_pop]["code"]
 
+        # Get user info for PDF report
+        user_info = None
+        if current_user.is_authenticated:
+            user_info = {
+                'name': current_user.username,
+                'email': getattr(current_user, 'email', None)
+            }
+
         return render_template(
             "prediction_results.html",
             results=display_results,
@@ -1443,6 +1461,7 @@ def show_prediction_results(patient_id):
             ancestry_loaded=True,
             raw_snp_prediction=True,
             full_results=prediction_results,
+            user_info=user_info,
         )
 
     except Exception as e:
@@ -1482,7 +1501,11 @@ def get_physical_characteristics_api():
                         )
                     analysis = query.order_by(AnalysisHistory.created_at.desc()).first()
                     if analysis:
-                        analysis.physical_characteristics = gemini_prediction.get("characteristics", "")
+                        # Convert dict to JSON string for database storage
+                        chars = gemini_prediction.get("characteristics", "")
+                        if isinstance(chars, dict):
+                            chars = json.dumps(chars)
+                        analysis.physical_characteristics = chars
                         db.session.commit()
                         print(f"✅ Physical characteristics saved for {sample_id}")
                 except Exception as db_err:
@@ -1529,7 +1552,12 @@ def get_disease_risk_report_api():
                         print(f"🔍 [Disease Risk] User is NOT authenticated")
                     analysis = query.order_by(AnalysisHistory.created_at.desc()).first()
                     if analysis:
-                        analysis.disease_risk_report = disease_report.get("report", "")
+                        # Convert diseases list to JSON string for storage
+                        diseases = disease_report.get("diseases", [])
+                        if isinstance(diseases, list):
+                            analysis.disease_risk_report = json.dumps(diseases)
+                        else:
+                            analysis.disease_risk_report = disease_report.get("report", str(diseases))
                         db.session.commit()
                         print(f"✅ Disease risk report saved for {sample_id} (analysis_id={analysis.id})")
                     else:
@@ -1546,6 +1574,28 @@ def get_disease_risk_report_api():
             return jsonify(disease_report)
         else:
             return jsonify({"success": False, "error": "Disease risk service not available"})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@predictions_page_bp.route("/get_health_guidance", methods=["POST"])
+def get_health_guidance_api():
+    """API endpoint to get AI health guidance based on disease risks"""
+    try:
+        data = request.json
+        diseases = data.get("diseases", [])
+        gender = data.get("gender", "Unknown")
+        population = data.get("population", "Unknown")
+
+        if not diseases:
+            return jsonify({"success": False, "error": "Missing disease risk data"})
+
+        if get_ai_health_guidance:
+            guidance_report = get_ai_health_guidance(diseases, gender, population)
+            return jsonify(guidance_report)
+        else:
+            return jsonify({"success": False, "error": "Health guidance service not available"})
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})

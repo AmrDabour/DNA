@@ -349,6 +349,96 @@
         font-size: 0.8rem;
         color: #fbbf24;
     }
+    
+    /* Health Guidance Styles */
+    .guidance-section {
+        margin-top: 2rem;
+        animation: fadeInUp 0.6s ease-out;
+    }
+    
+    .guidance-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+    
+    .guidance-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .guidance-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        transform: translateY(-5px);
+    }
+    
+    .guidance-card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    .guidance-category-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+    
+    .guidance-card.nutrition { border-top: 4px solid #f59e0b; }
+    .guidance-card.lifestyle { border-top: 4px solid #10b981; }
+    .guidance-card.screenings { border-top: 4px solid #3b82f6; }
+    .guidance-card.wellness { border-top: 4px solid #8b5cf6; }
+    
+    .guidance-category-icon.nutrition { color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+    .guidance-category-icon.lifestyle { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+    .guidance-category-icon.screenings { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+    .guidance-category-icon.wellness { color: #8b5cf6; background: rgba(139, 92, 246, 0.1); }
+    
+    .guidance-tip-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .guidance-tip-item {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.9rem;
+        color: #94a3b8;
+        line-height: 1.4;
+    }
+    
+    .guidance-tip-item:before {
+        content: "•";
+        color: var(--text-muted);
+        font-weight: bold;
+    }
+    
+    .guidance-summary {
+        margin-top: 2rem;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 16px;
+        text-align: center;
+    }
+    
+    .guidance-summary-text {
+        font-style: italic;
+        color: #a5b4fc;
+        font-size: 1.1rem;
+        margin: 0;
+    }
 
     .recommendations-list {
         padding-left: 1.5rem;
@@ -700,6 +790,46 @@
                 <div class="result-card-body">
                     {% if gemini_prediction.success %}
                     {{ gemini_prediction.characteristics | safe }}
+                    
+                    <!-- Pre-loaded AI Image (if exists) -->
+                    {% if generated_image and generated_image.success %}
+                    <div class="mt-4 pt-4 border-top">
+                        <div class="d-flex align-items-center mb-3">
+                            <h5 class="fw-bold mb-0">AI Generated Portrait</h5>
+                        </div>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body text-center">
+                                <img src="{{ url_for('serve_upload', filename=generated_image.image_filename) }}" 
+                                     alt="Generated Person Portrait" 
+                                     class="img-fluid rounded shadow-lg" 
+                                     style="max-width: 300px; max-height: 300px; object-fit: cover;"
+                                     onerror="this.style.visibility='hidden';">
+                                <p class="text-muted small mt-2">AI-generated portrait based on genetic predictions</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Image Generation inside the same block -->
+                    <div id="image-generation-block" class="mt-4 pt-4 border-top">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div>
+                                <h5 class="fw-bold mb-0">AI Person Image</h5>
+                                <p class="text-muted small mb-0">Generate a portrait based on these characteristics</p>
+                            </div>
+                            <button id="generate-person-image-inside" class="btn btn-sm btn-outline-info rounded-pill">
+                                <i class="fas fa-image me-1"></i>Generate Image
+                            </button>
+                        </div>
+                        
+                        <div id="image-loading-inside" class="loading-indicator mb-3" style="display: none;">
+                            <div class="spinner-border text-info spinner-border-sm" role="status"></div>
+                            <span>Generating person image...</span>
+                        </div>
+                        
+                        <div id="image-result-inside" class="mt-3 text-center"></div>
+                    </div>
+                    {% endif %}
+                    
                     {% else %}
                     <div class="info-alert">
                         <div class="d-flex align-items-center gap-3">
@@ -732,22 +862,45 @@
                     </div>
                 </div>
                 <div class="result-card-body">
-                    <div class="info-alert">
-                        <div class="d-flex align-items-center gap-3 flex-wrap">
-                            <i class="fas fa-info-circle fa-2x text-info"></i>
-                            <div class="flex-grow-1">
-                                <h5 class="mb-1 fw-bold">Request Physical Characteristics</h5>
-                                <p class="mb-2 text-muted">Use genetic prediction results to predict physical characteristics.</p>
+                    <div id="physical-request-container">
+                        <div class="info-alert">
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <i class="fas fa-info-circle fa-2x text-info"></i>
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-1 fw-bold">Request Physical Characteristics</h5>
+                                    <p class="mb-2 text-muted">Use genetic prediction results to predict physical characteristics.</p>
+                                </div>
+                                <button id="predict-physical" class="btn btn-success action-btn">
+                                    <i class="fas fa-magic me-2"></i>Predict Now
+                                </button>
                             </div>
-                            <button id="predict-physical" class="btn btn-success action-btn">
-                                <i class="fas fa-magic me-2"></i>Predict Now
-                            </button>
+                            <div id="prediction-loading" class="loading-indicator mt-3" style="display: none;">
+                                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                                <span>Analyzing genetic markers...</span>
+                            </div>
                         </div>
-                        <div id="prediction-loading" class="loading-indicator mt-3" style="display: none;">
-                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-                            <span>Analyzing genetic markers...</span>
-                        </div>
+                        
                         <div id="prediction-result" class="mt-3"></div>
+                        
+                        <!-- Image Generation Section (Hidden by default, shown after prediction) -->
+                        <div id="image-generation-block-dynamic" class="mt-4 pt-4 border-top" style="display: none;">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div>
+                                    <h5 class="fw-bold mb-0">AI Person Image</h5>
+                                    <p class="text-muted small mb-0">Generate a portrait based on these characteristics</p>
+                                </div>
+                                <button id="generate-person-image-dynamic" class="btn btn-sm btn-outline-info rounded-pill">
+                                    <i class="fas fa-image me-1"></i>Generate Image
+                                </button>
+                            </div>
+                            
+                            <div id="image-loading-dynamic" class="loading-indicator mb-3" style="display: none;">
+                                <div class="spinner-border text-info spinner-border-sm" role="status"></div>
+                                <span>Generating person image...</span>
+                            </div>
+                            
+                            <div id="image-result-dynamic" class="mt-3 text-center"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -772,6 +925,31 @@
                 </div>
                 <div class="result-card-body">
                     {{ disease_report.report | safe }}
+                    
+                    <!-- Guidance for pre-loaded reports -->
+                    <div id="health-guidance-section-pre" class="guidance-section mt-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div>
+                                <h5 class="fw-bold mb-0">AI Health Guidance</h5>
+                                <p class="text-muted small mb-0">Personalized recommendations based on this profile</p>
+                            </div>
+                            <button id="generate-guidance-btn-pre" class="btn btn-sm btn-outline-primary rounded-pill">
+                                <i class="fas fa-sparkles me-1"></i>Generate Guidance
+                            </button>
+                        </div>
+                        <div id="guidance-loading-pre" class="loading-indicator mb-3" style="display: none;">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                            <span>Generating personalized health tips...</span>
+                        </div>
+                        <div id="guidance-result-pre"></div>
+                    </div>
+                    
+                    <script>
+                        // Store data for pre-loaded report
+                        window.preLoadedDiseases = {{ disease_report.diseases | tojson if disease_report.diseases else '[]' }};
+                        window.preLoadedGender = "{{ results.gender.predicted if results.gender else 'Unknown' }}";
+                        window.preLoadedPopulation = "{{ results.ancestry.predicted if results.ancestry else 'Unknown' }}";
+                    </script>
                 </div>
             </div>
         </div>
@@ -809,6 +987,26 @@
                             </div>
                         </div>
                         <div id="disease-result" class="mt-3"></div>
+                        
+                        <!-- Health Guidance Section (Hidden by default) -->
+                        <div id="health-guidance-section" class="guidance-section mt-4" style="display: none;">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div>
+                                    <h5 class="fw-bold mb-0">AI Health Guidance</h5>
+                                    <p class="text-muted small mb-0">Personalized recommendations based on your risk profile</p>
+                                </div>
+                                <button id="generate-guidance-btn" class="btn btn-sm btn-outline-primary rounded-pill">
+                                    <i class="fas fa-sparkles me-1"></i>Generate Guidance
+                                </button>
+                            </div>
+                            
+                            <div id="guidance-loading" class="loading-indicator mb-3" style="display: none;">
+                                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                                <span>Generating personalized health tips...</span>
+                            </div>
+                            
+                            <div id="guidance-result"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -904,13 +1102,11 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- html2pdf Library for PDF Export -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <!-- Marked.js for Markdown rendering -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 
 <script>
-    // PDF Export Function
+    // PDF Export Function - Uses Backend API for Professional PDF Generation
     function exportToPDF() {
         const exportBtn = document.getElementById('export-pdf-btn');
         const originalText = exportBtn.innerHTML;
@@ -919,60 +1115,51 @@
         exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating PDF...';
         exportBtn.disabled = true;
         
-        // Get the content to export
-        const element = document.getElementById('results-content');
+        // Get analysis_id if available (from history view), otherwise use sample_id
+        const analysisId = '{{ analysis_id|default("", true) }}';
         const sampleId = '{{ sample_id }}';
         
-        // Create a clone to modify for PDF (without buttons)
-        const clone = element.cloneNode(true);
+        let apiUrl;
+        if (analysisId) {
+            // Use analysis ID endpoint for precise report
+            apiUrl = '/api/reports/' + analysisId + '/pdf';
+        } else {
+            // Use sample ID endpoint for latest analysis
+            apiUrl = '/api/reports/sample/' + encodeURIComponent(sampleId) + '/pdf';
+        }
         
-        // Remove elements that shouldn't be in PDF
-        const buttonsToRemove = clone.querySelectorAll('.export-buttons, #scrollToTop, .raw-json-toggle, #rawJsonData, .loading-indicator, #predict-physical, #predict-disease-risk, #generate-person-image, #retry-gemini');
-        buttonsToRemove.forEach(btn => btn.remove());
-        
-        // Add print-friendly header
-        const header = document.createElement('div');
-        header.innerHTML = `
-            <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #6366f1;">
-                <h1 style="color: #6366f1; margin-bottom: 5px;">🧬 Genova AI Analysis Report</h1>
-                <p style="color: #666; font-size: 14px;">Generated on ${new Date().toLocaleString()}</p>
-            </div>
-        `;
-        clone.insertBefore(header, clone.firstChild);
-        
-        // Configure PDF options
-        const opt = {
-            margin: [10, 10, 10, 10],
-            filename: `${sampleId}_genetic_analysis_report.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { 
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                letterRendering: true
-            },
-            jsPDF: { 
-                unit: 'mm', 
-                format: 'a4', 
-                orientation: 'portrait' 
-            },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-        };
-        
-        // Generate PDF
-        html2pdf().set(opt).from(clone).save().then(() => {
-            // Restore button state
-            exportBtn.innerHTML = originalText;
-            exportBtn.disabled = false;
-            
-            // Show success message
-            showToast('PDF exported successfully!', 'success');
-        }).catch(err => {
-            console.error('PDF Export Error:', err);
-            exportBtn.innerHTML = originalText;
-            exportBtn.disabled = false;
-            showToast('Error exporting PDF. Please try again.', 'error');
-        });
+        // Fetch PDF from backend
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Failed to generate PDF');
+                    });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = sampleId + '_GenovaAI_Medical_Report.pdf';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Restore button
+                exportBtn.innerHTML = originalText;
+                exportBtn.disabled = false;
+                showToast('Professional medical report downloaded successfully!', 'success');
+            })
+            .catch(error => {
+                console.error('PDF Export Error:', error);
+                exportBtn.innerHTML = originalText;
+                exportBtn.disabled = false;
+                showToast('Error generating PDF: ' + error.message, 'error');
+            });
     }
     
     // JSON Export Function
@@ -1077,6 +1264,10 @@
             if (data.success) {
                 const c = data.characteristics;
                 
+                // Hide the request section
+                const infoAlert = predictBtn.closest('.info-alert');
+                if (infoAlert) infoAlert.style.display = 'none';
+                
                 resultEl.innerHTML = `
                     <div class="characteristics-grid">
                         <div class="char-box hair">
@@ -1114,10 +1305,10 @@
                     </div>
                 `;
                 
-                // Show the image generation section after successful physical characteristics prediction
-                const imageSection = document.getElementById('image-generation-section');
-                if (imageSection) {
-                    imageSection.style.display = 'block';
+                // Show the image generation block after successful physical characteristics prediction
+                const imageBlock = document.getElementById('image-generation-block-dynamic');
+                if (imageBlock) {
+                    imageBlock.style.display = 'block';
                 }
             } else {
                 // Show error
@@ -1177,6 +1368,10 @@
                 console.log('Disease Risk Response:', data);
 
                 if (data.success && data.diseases && data.diseases.length > 0) {
+                    // Hide the generation button section
+                    const infoAlert = predictDiseaseBtn.closest('.info-alert');
+                    if (infoAlert) infoAlert.style.display = 'none';
+
                     // Build disease cards HTML
                     const getRiskIcon = (risk) => {
                         if (risk === 'high') return '🔴';
@@ -1212,6 +1407,16 @@
                             <p>⚠️ <strong>Medical Disclaimer:</strong> This is for informational purposes only. Consult a healthcare provider for personalized advice.</p>
                         </div>
                     `;
+                    
+                    // Show health guidance section
+                    const guidanceSection = document.getElementById('health-guidance-section');
+                    if (guidanceSection) {
+                        guidanceSection.style.display = 'block';
+                        // Store disease data for guidance request
+                        window.currentDiseases = data.diseases;
+                        window.currentGender = data.gender;
+                        window.currentPopulation = data.population;
+                    }
                 } else {
                     // Show error
                     resultEl.innerHTML = `
@@ -1235,85 +1440,251 @@
         });
     }
 
-    // Handle generate person image button
-    const generateImageBtn = document.getElementById('generate-person-image');
-    if (generateImageBtn) {
-        generateImageBtn.addEventListener('click', function () {
-            const loadingEl = document.getElementById('image-loading');
-            const resultEl = document.getElementById('image-result');
+    // Handle generate health guidance button (Pre-loaded)
+    const generateGuidanceBtnPre = document.getElementById('generate-guidance-btn-pre');
+    if (generateGuidanceBtnPre) {
+        generateGuidanceBtnPre.addEventListener('click', function () {
+            const loadingEl = document.getElementById('guidance-loading-pre');
+            const resultEl = document.getElementById('guidance-result-pre');
 
             loadingEl.style.display = 'block';
             resultEl.innerHTML = '';
+            generateGuidanceBtnPre.disabled = true;
 
-            // Get the prediction data from the page
-            const genderPrediction = {{ results.gender | tojson if results.gender else 'null' }};
-            const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null' }};
-
-            // Extract gender and population values
-            const gender = genderPrediction ? genderPrediction.predicted : 'Unknown';
-            const population = ancestryPrediction ? ancestryPrediction.predicted : 'Unknown';
-            const patientId = '{{ sample_id }}';
-
-            // Call the API
-            fetch('/api/predictions/generate-person-image', {
+            fetch('/get_health_guidance', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    gender: gender,
-                    population: population,
-                    patient_id: patientId
+                    diseases: window.preLoadedDiseases,
+                    gender: window.preLoadedGender,
+                    population: window.preLoadedPopulation
                 }),
             })
             .then(response => response.json())
             .then(data => {
                 loadingEl.style.display = 'none';
+                generateGuidanceBtnPre.disabled = false;
 
-                if (data.success) {
-                    // Display the generated image
+                if (data.success && data.guidance) {
+                    const g = data.guidance;
+                    
+                    // Hide the generate button
+                    generateGuidanceBtnPre.style.display = 'none';
+
+                    const renderTips = (tips) => tips.map(tip => `<li class="guidance-tip-item">${tip}</li>`).join('');
+                    
                     resultEl.innerHTML = `
-                        <div class="card">
-                            <div class="card-header bg-success text-white">
-                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Generated Person Image</h5>
-                            </div>
-                            <div class="card-body text-center">
-                                <img src="${data.image_data}" alt="Generated Person Portrait" 
-                                     class="img-fluid rounded shadow-lg" 
-                                     style="max-width: 400px; max-height: 400px; object-fit: cover;">
-                                <div class="mt-3">
-                                    <p class="text-muted">${data.description || 'AI-generated portrait based on genetic predictions'}</p>
-                                    <p><strong>Gender:</strong> ${data.gender} | <strong>Ancestry:</strong> ${data.population}</p>
-                                    <a href="${data.image_data}" download="${patientId}_portrait.png" class="btn btn-primary mt-2">
-                                        <i class="fas fa-download me-2"></i>Download Image
-                                    </a>
+                        <div class="guidance-grid">
+                            <div class="guidance-card nutrition">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon nutrition">🍎</div>
+                                    <h6 class="mb-0 fw-bold">Nutrition & Diet</h6>
                                 </div>
+                                <ul class="guidance-tip-list">${renderTips(g.nutrition || [])}</ul>
                             </div>
+                            <div class="guidance-card lifestyle">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon lifestyle">🏃</div>
+                                    <h6 class="mb-0 fw-bold">Lifestyle & Exercise</h6>
+                                </div>
+                                <ul class="guidance-tip-list">${renderTips(g.lifestyle || [])}</ul>
+                            </div>
+                            <div class="guidance-card screenings">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon screenings">🩺</div>
+                                    <h6 class="mb-0 fw-bold">Screenings</h6>
+                                </div>
+                                <ul class="guidance-tip-list">${renderTips(g.screenings || [])}</ul>
+                            </div>
+                            <div class="guidance-card wellness">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon wellness">🧘</div>
+                                    <h6 class="mb-0 fw-bold">Wellness Tips</h6>
+                                </div>
+                                <ul class="guidance-tip-list">${renderTips(g.wellness || [])}</ul>
+                            </div>
+                        </div>
+                        <div class="guidance-summary"><p class="guidance-summary-text">"${data.summary}"</p></div>
+                    `;
+                } else {
+                    resultEl.innerHTML = `<div class="alert alert-danger"><p>${data.error || 'Could not generate guidance'}</p></div>`;
+                }
+            });
+        });
+    }
+
+    // Handle generate health guidance button
+    const generateGuidanceBtn = document.getElementById('generate-guidance-btn');
+    if (generateGuidanceBtn) {
+        generateGuidanceBtn.addEventListener('click', function () {
+            const loadingEl = document.getElementById('guidance-loading');
+            const resultEl = document.getElementById('guidance-result');
+
+            if (!window.currentDiseases) {
+                alert('Please generate disease risk report first.');
+                return;
+            }
+
+            loadingEl.style.display = 'block';
+            resultEl.innerHTML = '';
+            generateGuidanceBtn.disabled = true;
+
+            fetch('/get_health_guidance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    diseases: window.currentDiseases,
+                    gender: window.currentGender,
+                    population: window.currentPopulation
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingEl.style.display = 'none';
+                generateGuidanceBtn.disabled = false;
+
+                if (data.success && data.guidance) {
+                    const g = data.guidance;
+                    
+                    // Hide the generate button
+                    generateGuidanceBtn.style.display = 'none';
+
+                    const renderTips = (tips) => {
+                        return tips.map(tip => `<li class="guidance-tip-item">${tip}</li>`).join('');
+                    };
+                    
+                    resultEl.innerHTML = `
+                        <div class="guidance-grid">
+                            <div class="guidance-card nutrition">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon nutrition">🍎</div>
+                                    <h6 class="mb-0 fw-bold">Nutrition & Diet</h6>
+                                </div>
+                                <ul class="guidance-tip-list">
+                                    ${renderTips(g.nutrition || [])}
+                                </ul>
+                            </div>
+                            
+                            <div class="guidance-card lifestyle">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon lifestyle">🏃</div>
+                                    <h6 class="mb-0 fw-bold">Lifestyle & Exercise</h6>
+                                </div>
+                                <ul class="guidance-tip-list">
+                                    ${renderTips(g.lifestyle || [])}
+                                </ul>
+                            </div>
+                            
+                            <div class="guidance-card screenings">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon screenings">🩺</div>
+                                    <h6 class="mb-0 fw-bold">Screenings</h6>
+                                </div>
+                                <ul class="guidance-tip-list">
+                                    ${renderTips(g.screenings || [])}
+                                </ul>
+                            </div>
+                            
+                            <div class="guidance-card wellness">
+                                <div class="guidance-card-header">
+                                    <div class="guidance-category-icon wellness">🧘</div>
+                                    <h6 class="mb-0 fw-bold">Wellness Tips</h6>
+                                </div>
+                                <ul class="guidance-tip-list">
+                                    ${renderTips(g.wellness || [])}
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="guidance-summary">
+                            <p class="guidance-summary-text">"${data.summary}"</p>
                         </div>
                     `;
                 } else {
-                    // Show error
                     resultEl.innerHTML = `
                         <div class="alert alert-danger">
                             <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
-                            <p>${data.error}</p>
-                            ${data.response_text ? '<p><strong>Model Response:</strong> ' + data.response_text + '</p>' : ''}
+                            <p>${data.error || 'Could not generate guidance'}</p>
                         </div>
                     `;
                 }
             })
             .catch(error => {
                 loadingEl.style.display = 'none';
+                generateGuidanceBtn.disabled = false;
                 resultEl.innerHTML = `
                     <div class="alert alert-danger">
                         <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
-                        <p>Failed to connect to the server. Please try again later.</p>
+                        <p>Failed to connect to the server.</p>
                     </div>
                 `;
                 console.error('Error:', error);
             });
         });
     }
+
+    // Unified Image Generation Handler
+    const handleImageGeneration = (btnId, loadingId, resultId) => {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            const loadingEl = document.getElementById(loadingId);
+            const resultEl = document.getElementById(resultId);
+
+            loadingEl.style.display = 'block';
+            resultEl.innerHTML = '';
+            btn.disabled = true;
+
+            // Get the prediction data from the page
+            const genderPrediction = {{ results.gender | tojson if results.gender else 'null' }};
+            const ancestryPrediction = {{ results.ancestry | tojson if results.ancestry else 'null' }};
+            const gender = genderPrediction ? (genderPrediction.predicted || genderPrediction.gender) : 'Unknown';
+            const population = ancestryPrediction ? (ancestryPrediction.predicted || ancestryPrediction.code) : 'Unknown';
+            const patientId = '{{ sample_id }}';
+
+            fetch('/api/predictions/generate-person-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gender, population, patient_id: patientId }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingEl.style.display = 'none';
+                btn.disabled = false;
+
+                if (data.success) {
+                    btn.style.display = 'none';
+                            resultEl.innerHTML = `
+                                <div class="mt-3">
+                                    <img src="${data.image_data}" alt="AI Portrait" 
+                                         class="img-fluid rounded shadow-lg" 
+                                         style="max-width: 100%; width: 300px; border: 2px solid rgba(255,255,255,0.1); object-fit: cover;">
+                                    <p class="text-muted small mt-2">${data.description || 'AI-generated portrait'}</p>
+                                    <a href="${data.image_data}" download="${patientId}_ai_portrait.png" class="btn btn-sm btn-link text-info">
+                                        <i class="fas fa-download me-1"></i>Download
+                                    </a>
+                                </div>
+                            `;
+                } else {
+                    resultEl.innerHTML = `<div class="alert alert-danger small">${data.error}</div>`;
+                }
+            })
+            .catch(error => {
+                loadingEl.style.display = 'none';
+                btn.disabled = false;
+                resultEl.innerHTML = `<div class="alert alert-danger small">Connection failed.</div>`;
+            });
+        });
+    };
+
+    // Initialize all potential image generation buttons
+    handleImageGeneration('generate-person-image-inside', 'image-loading-inside', 'image-result-inside');
+    handleImageGeneration('generate-person-image-dynamic', 'image-loading-dynamic', 'image-result-dynamic');
 
     // Handle retry button
     const retryBtn = document.getElementById('retry-gemini');
