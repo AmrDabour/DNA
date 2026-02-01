@@ -377,32 +377,24 @@ def get_ai_health_guidance(diseases, gender, population):
         
         disease_names = ", ".join([d.get('name', 'Unknown') for d in diseases])
         
-        prompt = f"""You are a personalized health and wellness advisor. 
-Based on these genetic disease risks for a {gender} individual from the {population} population:
-Risks identified: {disease_names}
+        prompt = f"""You are a health advisor. Based on genetic disease risks for a {gender} from {population} population:
+Risks: {disease_names}
 
-Provide actionable, personalized health guidance in the following categories:
-1. Nutrition & Diet (specific foods to include/avoid)
-2. Lifestyle & Exercise (types of activity, habits)
-3. Preventive Screenings (specific tests or checkups to consider)
-4. Wellness Tips (stress management, sleep, supplements if relevant)
-
-Return ONLY valid JSON (no markdown, no code blocks):
+Return ONLY valid JSON (no markdown):
 {{
     "guidance": {{
-        "nutrition": ["tip 1", "tip 2", "tip 3"],
-        "lifestyle": ["tip 1", "tip 2", "tip 3"],
-        "screenings": ["tip 1", "tip 2", "tip 3"],
-        "wellness": ["tip 1", "tip 2", "tip 3"]
+        "nutrition": ["brief tip 1", "brief tip 2", "brief tip 3"],
+        "lifestyle": ["brief tip 1", "brief tip 2", "brief tip 3"],
+        "screenings": ["brief tip 1", "brief tip 2", "brief tip 3"],
+        "wellness": ["brief tip 1", "brief tip 2", "brief tip 3"]
     }},
-    "summary": "Full overview sentence"
+    "summary": "One short sentence"
 }}
 
 Rules:
-- Provide 3-4 specific, high-quality tips per category
-- Tailor advice to the specific risks mentioned: {disease_names}
-- Maintain a professional, encouraging tone
-- Include a 1-sentence summary at the end"""
+- Only 3 short tips per category (max 10 words each)
+- Keep summary under 15 words
+- Be concise"""
 
         response = model.generate_content(prompt)
         response_text = response.text.strip()

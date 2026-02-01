@@ -11,21 +11,22 @@
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
-    
+
     .dashboard-card {
-        background: var(--glass-bg);
+        background: var(--bg-card);
         backdrop-filter: blur(20px);
         border-radius: var(--radius-xl);
         border: 1px solid var(--glass-border);
         transition: all 0.3s ease;
         overflow: hidden;
+        box-shadow: var(--shadow-card);
     }
-    
+
     .dashboard-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
     }
-    
+
     .dashboard-card-header {
         padding: 1.25rem 1.5rem;
         border-bottom: 1px solid var(--glass-border);
@@ -33,13 +34,13 @@
         align-items: center;
         justify-content: space-between;
     }
-    
+
     .dashboard-card-body {
         padding: 1.5rem;
     }
-    
+
     .metric-card {
-        background: var(--glass-bg);
+        background: var(--bg-card);
         backdrop-filter: blur(20px);
         border-radius: var(--radius-lg);
         border: 1px solid var(--glass-border);
@@ -48,8 +49,9 @@
         transition: all 0.3s ease;
         position: relative;
         overflow: hidden;
+        box-shadow: var(--shadow-card);
     }
-    
+
     .metric-card::before {
         content: '';
         position: absolute;
@@ -59,12 +61,12 @@
         height: 4px;
         background: var(--gradient-primary);
     }
-    
+
     .metric-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 15px 30px rgba(99, 102, 241, 0.2);
     }
-    
+
     .metric-icon {
         width: 60px;
         height: 60px;
@@ -76,14 +78,31 @@
         margin: 0 auto 1rem;
         color: white;
     }
-    
-    .metric-icon.purple { background: linear-gradient(135deg, #8b5cf6, #a855f7); }
-    .metric-icon.blue { background: linear-gradient(135deg, #6366f1, #818cf8); }
-    .metric-icon.cyan { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
-    .metric-icon.green { background: linear-gradient(135deg, #10b981, #34d399); }
-    .metric-icon.orange { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
-    .metric-icon.pink { background: linear-gradient(135deg, #ec4899, #f472b6); }
-    
+
+    .metric-icon.purple {
+        background: linear-gradient(135deg, #8b5cf6, #a855f7);
+    }
+
+    .metric-icon.blue {
+        background: linear-gradient(135deg, #6366f1, #818cf8);
+    }
+
+    .metric-icon.cyan {
+        background: linear-gradient(135deg, #06b6d4, #22d3ee);
+    }
+
+    .metric-icon.green {
+        background: linear-gradient(135deg, #10b981, #34d399);
+    }
+
+    .metric-icon.orange {
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    }
+
+    .metric-icon.pink {
+        background: linear-gradient(135deg, #ec4899, #f472b6);
+    }
+
     .metric-value {
         font-size: 2.5rem;
         font-weight: 700;
@@ -93,13 +112,13 @@
         background-clip: text;
         line-height: 1.2;
     }
-    
+
     .metric-label {
         color: var(--text-muted);
         font-size: 0.9rem;
         margin-top: 0.5rem;
     }
-    
+
     .metric-change {
         font-size: 0.8rem;
         margin-top: 0.5rem;
@@ -109,22 +128,22 @@
         padding: 4px 10px;
         border-radius: 20px;
     }
-    
+
     .metric-change.positive {
         background: rgba(16, 185, 129, 0.1);
         color: #10b981;
     }
-    
+
     .metric-change.negative {
         background: rgba(239, 68, 68, 0.1);
         color: #ef4444;
     }
-    
+
     .chart-container {
         position: relative;
         height: 300px;
     }
-    
+
     .activity-item {
         display: flex;
         align-items: flex-start;
@@ -133,17 +152,17 @@
         border-bottom: 1px solid var(--glass-border);
         transition: all 0.3s ease;
     }
-    
+
     .activity-item:last-child {
         border-bottom: none;
     }
-    
+
     .activity-item:hover {
         background: rgba(99, 102, 241, 0.05);
         margin: 0 -1.5rem;
         padding: 1rem 1.5rem;
     }
-    
+
     .activity-icon {
         width: 40px;
         height: 40px;
@@ -154,41 +173,52 @@
         font-size: 1rem;
         flex-shrink: 0;
     }
-    
-    .activity-icon.prediction { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
-    .activity-icon.upload { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-    .activity-icon.chat { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
-    
+
+    .activity-icon.prediction {
+        background: rgba(99, 102, 241, 0.1);
+        color: #6366f1;
+    }
+
+    .activity-icon.upload {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .activity-icon.chat {
+        background: rgba(139, 92, 246, 0.1);
+        color: #8b5cf6;
+    }
+
     .activity-content h6 {
         margin: 0 0 4px;
         font-weight: 600;
     }
-    
+
     .activity-content p {
         margin: 0;
         font-size: 0.85rem;
         color: var(--text-muted);
     }
-    
+
     .activity-time {
         font-size: 0.75rem;
         color: var(--text-muted);
         white-space: nowrap;
     }
-    
+
     .population-bar {
         display: flex;
         align-items: center;
         gap: 1rem;
         margin-bottom: 1rem;
     }
-    
+
     .population-bar-label {
         width: 80px;
         font-weight: 600;
         font-size: 0.9rem;
     }
-    
+
     .population-bar-track {
         flex: 1;
         height: 12px;
@@ -196,20 +226,20 @@
         border-radius: 6px;
         overflow: hidden;
     }
-    
+
     .population-bar-fill {
         height: 100%;
         border-radius: 6px;
         transition: width 1s ease;
     }
-    
+
     .population-bar-value {
         width: 50px;
         text-align: right;
         font-weight: 600;
         font-size: 0.9rem;
     }
-    
+
     .quick-action-btn {
         display: flex;
         flex-direction: column;
@@ -223,36 +253,45 @@
         text-decoration: none;
         color: var(--text-primary);
     }
-    
+
     .quick-action-btn:hover {
         background: var(--gradient-primary);
         color: white;
         transform: translateY(-5px);
         box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
     }
-    
+
     .quick-action-btn i {
         font-size: 2rem;
         margin-bottom: 0.75rem;
     }
-    
+
     .quick-action-btn span {
         font-weight: 600;
     }
-    
+
     .no-data-placeholder {
         background: linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
         border-radius: var(--radius-lg);
         border: 2px dashed var(--glass-border);
     }
-    
+
     .no-data-placeholder .placeholder-icon {
         animation: pulse-gentle 2s ease-in-out infinite;
     }
-    
+
     @keyframes pulse-gentle {
-        0%, 100% { transform: scale(1); opacity: 0.3; }
-        50% { transform: scale(1.05); opacity: 0.5; }
+
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 0.3;
+        }
+
+        50% {
+            transform: scale(1.05);
+            opacity: 0.5;
+        }
     }
 </style>
 {% endblock %}
@@ -377,7 +416,8 @@
         <div class="col-lg-4" data-aos="fade-up" data-aos-delay="200">
             <div class="dashboard-card h-100">
                 <div class="dashboard-card-header">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-chart-pie me-2 text-primary"></i>Population Distribution</h5>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-chart-pie me-2 text-primary"></i>Population Distribution
+                    </h5>
                 </div>
                 <div class="dashboard-card-body">
                     <div class="chart-container">
@@ -401,7 +441,8 @@
                     <div class="population-bar">
                         <div class="population-bar-label">{{ pop.code }}</div>
                         <div class="population-bar-track">
-                            <div class="population-bar-fill" style="width: {{ pop.percentage }}%; background: {{ pop.color }};"></div>
+                            <div class="population-bar-fill"
+                                style="width: {{ pop.percentage }}%; background: {{ pop.color }};"></div>
                         </div>
                         <div class="population-bar-value">{{ pop.percentage }}%</div>
                     </div>
@@ -479,7 +520,8 @@
         <div class="col-md-6" data-aos="fade-up" data-aos-delay="100">
             <div class="dashboard-card">
                 <div class="dashboard-card-header">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-venus-mars me-2 text-primary"></i>Gender Prediction Stats</h5>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-venus-mars me-2 text-primary"></i>Gender Prediction Stats
+                    </h5>
                 </div>
                 <div class="dashboard-card-body">
                     <div class="chart-container" style="height: 200px;">
@@ -491,7 +533,8 @@
         <div class="col-md-6" data-aos="fade-up" data-aos-delay="200">
             <div class="dashboard-card">
                 <div class="dashboard-card-header">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-tachometer-alt me-2 text-primary"></i>Model Performance</h5>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-tachometer-alt me-2 text-primary"></i>Model Performance
+                    </h5>
                 </div>
                 <div class="dashboard-card-body">
                     <div class="row text-center">
@@ -521,66 +564,66 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Analysis Trends Chart - Only render if we have data
-    {% if stats.has_analysis_data %}
-    const trendsCtx = document.getElementById('trendsChart');
-    if (trendsCtx) {
-        new Chart(trendsCtx.getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: {{ stats.weekly_labels | tojson }},
-                datasets: [{
-                    label: 'Analyses',
-                    data: {{ stats.weekly_data | tojson }},
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointBackgroundColor: '#6366f1',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 5,
-                    pointHoverRadius: 7
+    document.addEventListener('DOMContentLoaded', function () {
+        // Analysis Trends Chart - Only render if we have data
+        {% if stats.has_analysis_data %}
+        const trendsCtx = document.getElementById('trendsChart');
+        if (trendsCtx) {
+            new Chart(trendsCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: {{ stats.weekly_labels | tojson }},
+        datasets: [{
+            label: 'Analyses',
+            data: {{ stats.weekly_data | tojson }},
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        fill: true,
+        tension: 0.4,
+        borderWidth: 3,
+        pointBackgroundColor: '#6366f1',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(99, 102, 241, 0.9)',
-                        titleFont: { size: 14 },
-                        bodyFont: { size: 13 },
-                        padding: 12,
-                        cornerRadius: 8,
-                        callbacks: {
-                            label: function(context) {
-                                return `${context.parsed.y} analyses`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 1,
-                            callback: function(value) {
-                                if (Number.isInteger(value)) {
-                                    return value;
-                                }
-                            }
-                        },
-                        grid: { color: 'rgba(0,0,0,0.05)' }
-                    },
-                    x: {
-                        grid: { display: false }
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(99, 102, 241, 0.9)',
+                titleFont: { size: 14 },
+                bodyFont: { size: 13 },
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                    label: function (context) {
+                        return `${context.parsed.y} analyses`;
                     }
                 }
             }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1,
+                    callback: function (value) {
+                        if (Number.isInteger(value)) {
+                            return value;
+                        }
+                    }
+                },
+                grid: { color: 'rgba(0,0,0,0.05)' }
+            },
+            x: {
+                grid: { display: false }
+            }
+        }
+    }
         });
     }
     {% endif %}
@@ -591,25 +634,25 @@ document.addEventListener('DOMContentLoaded', function() {
         type: 'doughnut',
         data: {
             labels: {{ stats.population_labels | tojson }},
-            datasets: [{
-                data: {{ stats.population_data | tojson }},
-                backgroundColor: [
-                    '#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b',
-                    '#ec4899', '#ef4444', '#84cc16', '#14b8a6', '#f97316', '#8b5cf6'
-                ],
-                borderWidth: 0
+        datasets: [{
+            data: {{ stats.population_data | tojson }},
+        backgroundColor: [
+            '#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b',
+            '#ec4899', '#ef4444', '#84cc16', '#14b8a6', '#f97316', '#8b5cf6'
+        ],
+        borderWidth: 0
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 12, padding: 10 }
-                }
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { boxWidth: 12, padding: 10 }
             }
         }
+    }
     });
 
     // Gender Distribution Chart
@@ -620,19 +663,19 @@ document.addEventListener('DOMContentLoaded', function() {
             labels: ['Male', 'Female'],
             datasets: [{
                 data: {{ stats.gender_data | tojson }},
-                backgroundColor: ['#6366f1', '#ec4899'],
-                borderWidth: 0
-            }]
+        backgroundColor: ['#6366f1', '#ec4899'],
+        borderWidth: 0
+    }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
             }
         }
+    }
     });
 });
 </script>

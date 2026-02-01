@@ -537,7 +537,7 @@ class MedicalReportPDF:
                             ],
                             [
                                 Paragraph(f'<font size="8" color="#64748b">Genes: {genes}</font>', self.styles['Normal']),
-                                Paragraph(f'<font size="8" color="#64748b">Prevalence: {prevalence}</font>', self.styles['Normal'])
+                                ''
                             ],
                             [
                                 Paragraph(f'<font size="9" color="#374151">{description}</font>', self.styles['Normal']),
@@ -583,24 +583,6 @@ class MedicalReportPDF:
                 ]))
                 elements.append(risk_table)
         
-        # Clinical note
-        elements.append(Spacer(1, 10))
-        note_data = [[Paragraph(
-            '<font color="#c2410c"><b>Clinical Note:</b> These risk assessments are based on genetic markers '
-            'and should be interpreted by a qualified healthcare professional. They do not constitute a medical diagnosis.</font>',
-            ParagraphStyle('Note', parent=self.styles['SmallText'], textColor=colors.HexColor('#c2410c'))
-        )]]
-        note_table = Table(note_data, colWidths=[480])
-        note_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fff7ed')),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('BOX', (0, 0), (-1, -1), 0, colors.white),
-            ('LINEBEFORE', (0, 0), (0, -1), 3, colors.HexColor('#f97316')),
-        ]))
-        elements.append(note_table)
         elements.append(Spacer(1, 15))
         
         return elements
@@ -660,7 +642,7 @@ class MedicalReportPDF:
             card_data = [
                 [
                     Paragraph(f'<font size="11" color="{text_color}"><b>{cat_name}</b></font>', self.styles['Normal']),
-                    Paragraph(f'<font size="9" color="{text_color}"><b>RECOMMENDATION</b></font>', self.styles['Normal'])
+                    ''
                 ],
                 [
                     Paragraph(f'<font size="9" color="#374151">• {tips[0] if len(tips) > 0 else ""}</font>', self.styles['Normal']),
@@ -820,6 +802,87 @@ class MedicalReportPDF:
         
         return elements
     
+    def _add_first_page_footer(self, canvas, doc):
+        """Add only footer to first page (no header)"""
+        canvas.saveState()
+        
+        width, height = A4
+        
+        # ===== FOOTER ONLY =====
+        # Footer line
+        canvas.setStrokeColor(self.BORDER_COLOR)
+        canvas.setLineWidth(1)
+        canvas.line(30, 40, width - 30, 40)
+        
+        # Footer content
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.HexColor('#64748b'))
+        
+        # Left: Company info
+        canvas.drawString(35, 28, "GenovaAI Genetic Analysis Platform")
+        canvas.drawString(35, 18, "Advanced DNA Analysis & Risk Assessment")
+        
+        # Center: Page number
+        canvas.drawCentredString(width / 2, 23, f"Page {doc.page}")
+        
+        # Right: Date
+        canvas.drawRightString(width - 35, 28, f"Generated: {self.report_date.strftime('%B %d, %Y')}")
+        canvas.drawRightString(width - 35, 18, "Confidential Medical Report")
+        
+        canvas.restoreState()
+    
+    def _add_page_header_footer(self, canvas, doc):
+        """Add header and footer to pages (except first page)"""
+        canvas.saveState()
+        
+        width, height = A4
+        
+        # ===== HEADER =====
+        # Header background
+        canvas.setFillColor(colors.HexColor('#f8fafc'))
+        canvas.rect(0, height - 50, width, 50, fill=1, stroke=0)
+        
+        # Header line
+        canvas.setStrokeColor(self.PRIMARY_COLOR)
+        canvas.setLineWidth(2)
+        canvas.line(30, height - 50, width - 30, height - 50)
+        
+        # Logo text - GenovaAI
+        canvas.setFont('Helvetica-Bold', 14)
+        canvas.setFillColor(self.PRIMARY_COLOR)
+        canvas.drawString(35, height - 35, "GENOVA")
+        canvas.setFillColor(self.SECONDARY_COLOR)
+        canvas.drawString(95, height - 35, "AI")
+        
+        # Report ID on right
+        canvas.setFont('Helvetica', 9)
+        canvas.setFillColor(colors.HexColor('#64748b'))
+        canvas.drawRightString(width - 35, height - 28, f"Report: {self.report_id}")
+        canvas.drawRightString(width - 35, height - 40, f"Sample: {self.analysis.get('sample_id', 'N/A')}")
+        
+        # ===== FOOTER =====
+        # Footer line
+        canvas.setStrokeColor(self.BORDER_COLOR)
+        canvas.setLineWidth(1)
+        canvas.line(30, 40, width - 30, 40)
+        
+        # Footer content
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.HexColor('#64748b'))
+        
+        # Left: Company info
+        canvas.drawString(35, 28, "GenovaAI Genetic Analysis Platform")
+        canvas.drawString(35, 18, "Advanced DNA Analysis & Risk Assessment")
+        
+        # Center: Page number
+        canvas.drawCentredString(width / 2, 23, f"Page {doc.page}")
+        
+        # Right: Date
+        canvas.drawRightString(width - 35, 28, f"Generated: {self.report_date.strftime('%B %d, %Y')}")
+        canvas.drawRightString(width - 35, 18, "Confidential Medical Report")
+        
+        canvas.restoreState()
+    
     def generate(self) -> BytesIO:
         """
         Generate the PDF report
@@ -827,19 +890,48 @@ class MedicalReportPDF:
         Returns:
             BytesIO buffer containing the PDF
         """
+        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+        
         buffer = BytesIO()
         
-        # Create document
-        doc = SimpleDocTemplate(
+        # Create document with BaseDocTemplate to support different page templates
+        doc = BaseDocTemplate(
             buffer,
             pagesize=A4,
-            rightMargin=30,
-            leftMargin=30,
-            topMargin=30,
-            bottomMargin=30,
             title=f"GenovaAI Genetic Analysis Report - {self.analysis.get('sample_id', 'Report')}",
             author="GenovaAI Genetic Analysis Platform"
         )
+        
+        width, height = A4
+        
+        # Frame for first page - smaller top margin (no header)
+        first_page_frame = Frame(
+            30, 55,  # x, y (bottom-left)
+            width - 60, height - 85,  # width, height (30 top margin + 55 bottom margin)
+            id='first_page'
+        )
+        
+        # Frame for later pages - larger top margin for header
+        later_page_frame = Frame(
+            30, 55,  # x, y
+            width - 60, height - 120,  # width, height (65 top margin + 55 bottom margin)
+            id='later_pages'
+        )
+        
+        # Create page templates
+        first_page_template = PageTemplate(
+            id='FirstPage',
+            frames=[first_page_frame],
+            onPage=self._add_first_page_footer
+        )
+        
+        later_page_template = PageTemplate(
+            id='LaterPages',
+            frames=[later_page_frame],
+            onPage=self._add_page_header_footer
+        )
+        
+        doc.addPageTemplates([first_page_template, later_page_template])
         
         # Build content
         elements = []
@@ -849,6 +941,10 @@ class MedicalReportPDF:
         elements.extend(self._create_patient_info_section())
         elements.extend(self._create_genetic_profile_section())
         elements.extend(self._create_physical_characteristics_section())
+        
+        # Switch to later pages template after first page (with header space)
+        from reportlab.platypus import NextPageTemplate
+        elements.append(NextPageTemplate('LaterPages'))
         
         # Disease Risk on Page 2 for cleaner layout
         elements.append(PageBreak())
@@ -860,9 +956,9 @@ class MedicalReportPDF:
         
         # elements.extend(self._create_analysis_metadata_section())  # Removed - not needed in report
         elements.extend(self._create_disclaimer_section())
-        elements.extend(self._create_footer())
+        # Note: Footer is added via onPage callbacks in PageTemplates
         
-        # Build PDF
+        # Build PDF with page templates
         doc.build(elements)
         
         buffer.seek(0)

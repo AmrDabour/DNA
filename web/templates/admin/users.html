@@ -5,24 +5,24 @@
 {% block extra_css %}
 <style>
     :root {
-        --admin-primary: #0f172a;
-        --admin-secondary: #1e293b;
         --admin-accent: #3b82f6;
         --admin-accent-light: #60a5fa;
         --admin-success: #10b981;
         --admin-warning: #f59e0b;
         --admin-danger: #ef4444;
-        --admin-text: #f8fafc;
-        --admin-text-muted: #94a3b8;
-        --admin-border: #334155;
-        --glass-bg: rgba(30, 41, 59, 0.8);
-        --glass-border: rgba(148, 163, 184, 0.1);
+
+        /* Map to global theme variables */
+        --admin-text: var(--text-primary);
+        --admin-text-muted: var(--text-secondary);
+        --admin-border: var(--glass-border);
+        --admin-card-bg: var(--bg-card);
+        --admin-item-bg: var(--bg-secondary);
+        --glass-bg: var(--bg-card);
+        --glass-border: var(--glass-border);
     }
 
-    body {
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
-        min-height: 100vh;
-    }
+    /* Remove body override to use global theme */
+    /* body { ... } removed */
 
     .admin-wrapper {
         padding: 2rem;
@@ -42,7 +42,8 @@
     .admin-title {
         font-size: 2rem;
         font-weight: 700;
-        background: linear-gradient(135deg, #fff 0%, #60a5fa 100%);
+        /* Gradient text compatible with both modes */
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
@@ -101,7 +102,7 @@
     }
 
     .btn-admin-outline:hover {
-        background: var(--glass-bg);
+        background: var(--admin-item-bg);
         border-color: var(--admin-accent);
     }
 
@@ -126,7 +127,7 @@
         padding: 0.75rem 1rem 0.75rem 2.75rem;
         border-radius: 0.75rem;
         border: 1px solid var(--glass-border);
-        background: var(--glass-bg);
+        background: var(--admin-card-bg);
         color: var(--admin-text);
         font-size: 0.95rem;
     }
@@ -168,11 +169,12 @@
 
     /* Users Table Card */
     .card {
-        background: var(--glass-bg);
+        background: var(--admin-card-bg);
         border: 1px solid var(--glass-border);
         border-radius: 1rem;
         padding: 1.5rem;
         backdrop-filter: blur(10px);
+        box-shadow: var(--shadow-card);
     }
 
     .users-table {
@@ -189,7 +191,7 @@
         letter-spacing: 0.05em;
         color: var(--admin-text-muted);
         border-bottom: 1px solid var(--glass-border);
-        background: rgba(15, 23, 42, 0.3);
+        background: var(--admin-item-bg);
     }
 
     .users-table th:first-child {
@@ -258,10 +260,25 @@
         letter-spacing: 0.025em;
     }
 
-    .badge-admin { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
-    .badge-user { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-    .badge-active { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .badge-inactive { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .badge-admin {
+        background: rgba(139, 92, 246, 0.2);
+        color: #a78bfa;
+    }
+
+    .badge-user {
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+    }
+
+    .badge-active {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+    }
+
+    .badge-inactive {
+        background: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+    }
 
     /* Toggle Switch */
     .toggle-switch {
@@ -297,11 +314,11 @@
         transition: all 0.3s;
     }
 
-    .toggle-switch input:checked + .toggle-slider {
+    .toggle-switch input:checked+.toggle-slider {
         background: var(--admin-success);
     }
 
-    .toggle-switch input:checked + .toggle-slider::before {
+    .toggle-switch input:checked+.toggle-slider::before {
         transform: translateX(20px);
     }
 
@@ -327,7 +344,7 @@
     }
 
     .action-btn:hover {
-        background: var(--glass-bg);
+        background: var(--admin-item-bg);
         color: var(--admin-accent);
         border-color: var(--admin-accent);
     }
@@ -350,9 +367,10 @@
         align-items: center;
         gap: 0.5rem;
         padding: 0.5rem 1rem;
-        background: var(--glass-bg);
+        background: var(--admin-card-bg);
         border: 1px solid var(--glass-border);
         border-radius: 9999px;
+        box-shadow: var(--shadow-sm);
     }
 
     .stat-pill-value {
@@ -382,12 +400,13 @@
     }
 
     .modal {
-        background: var(--admin-secondary);
+        background: var(--admin-card-bg);
         border: 1px solid var(--glass-border);
         border-radius: 1rem;
         padding: 2rem;
         max-width: 400px;
         width: 90%;
+        box-shadow: var(--shadow-xl);
     }
 
     .modal-title {
@@ -444,10 +463,10 @@
     .toast {
         padding: 1rem 1.5rem;
         border-radius: 0.75rem;
-        background: var(--admin-secondary);
+        background: var(--admin-card-bg);
         border: 1px solid var(--glass-border);
         color: var(--admin-text);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: var(--shadow-xl);
         margin-top: 0.5rem;
         animation: slideIn 0.3s ease;
         display: flex;
@@ -455,13 +474,28 @@
         gap: 0.75rem;
     }
 
-    .toast.success { border-left: 4px solid var(--admin-success); }
-    .toast.error { border-left: 4px solid var(--admin-danger); }
-    .toast.warning { border-left: 4px solid var(--admin-warning); }
+    .toast.success {
+        border-left: 4px solid var(--admin-success);
+    }
+
+    .toast.error {
+        border-left: 4px solid var(--admin-danger);
+    }
+
+    .toast.warning {
+        border-left: 4px solid var(--admin-warning);
+    }
 
     @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
     }
 
     /* Empty State */
@@ -562,10 +596,8 @@
             </thead>
             <tbody id="users-table-body">
                 {% for user in users %}
-                <tr data-user-id="{{ user.id }}" 
-                    data-username="{{ user.username | lower }}"
-                    data-email="{{ user.email | lower }}"
-                    data-is-admin="{{ user.is_admin }}"
+                <tr data-user-id="{{ user.id }}" data-username="{{ user.username | lower }}"
+                    data-email="{{ user.email | lower }}" data-is-admin="{{ user.is_admin }}"
                     data-is-active="{{ user.is_active }}">
                     <td>
                         <div class="user-info">
@@ -590,19 +622,17 @@
                     </td>
                     <td>
                         <label class="toggle-switch">
-                            <input type="checkbox" 
-                                   {% if user.is_admin %}checked{% endif %}
-                                   onchange="toggleAdmin({{ user.id }}, this)"
-                                   {% if current_user.id == user.id %}disabled{% endif %}>
+                            <input type="checkbox" {% if user.is_admin %}checked{% endif %}
+                                onchange="toggleAdmin({{ user.id }}, this)" {% if current_user.id==user.id %}disabled{%
+                                endif %}>
                             <span class="toggle-slider"></span>
                         </label>
                     </td>
                     <td>
                         <label class="toggle-switch">
-                            <input type="checkbox" 
-                                   {% if user.is_active %}checked{% endif %}
-                                   onchange="toggleActive({{ user.id }}, this)"
-                                   {% if current_user.id == user.id %}disabled{% endif %}>
+                            <input type="checkbox" {% if user.is_active %}checked{% endif %}
+                                onchange="toggleActive({{ user.id }}, this)" {% if current_user.id==user.id %}disabled{%
+                                endif %}>
                             <span class="toggle-slider"></span>
                         </label>
                     </td>
@@ -613,9 +643,9 @@
                             <button class="action-btn" title="View Details" onclick="viewUser({{ user.id }})">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <button class="action-btn danger" title="Delete User" 
-                                    onclick="confirmDelete({{ user.id }}, '{{ user.username }}')"
-                                    {% if current_user.id == user.id %}disabled{% endif %}>
+                            <button class="action-btn danger" title="Delete User"
+                                onclick="confirmDelete({{ user.id }}, '{{ user.username }}')" {% if
+                                current_user.id==user.id %}disabled{% endif %}>
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -680,7 +710,7 @@
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await response.json();
-            
+
             if (data.success) {
                 showToast(data.message, 'success');
                 // Update badge
@@ -689,11 +719,11 @@
                 badge.className = `badge ${data.is_admin ? 'badge-admin' : 'badge-user'}`;
                 badge.textContent = data.is_admin ? 'Admin' : 'User';
                 row.dataset.isAdmin = data.is_admin;
-                
+
                 // Update avatar
                 const avatar = row.querySelector('.user-avatar');
                 avatar.className = `user-avatar ${data.is_admin ? 'admin' : ''}`;
-                
+
                 updateStats();
             } else {
                 showToast(data.error, 'error');
@@ -713,7 +743,7 @@
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await response.json();
-            
+
             if (data.success) {
                 showToast(data.message, 'success');
                 // Update badge
@@ -722,7 +752,7 @@
                 badge.className = `badge ${data.is_active ? 'badge-active' : 'badge-inactive'}`;
                 badge.textContent = data.is_active ? 'Active' : 'Inactive';
                 row.dataset.isActive = data.is_active;
-                
+
                 updateStats();
             } else {
                 showToast(data.error, 'error');
@@ -756,14 +786,14 @@
     // Delete user
     document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
         if (!deleteUserId) return;
-        
+
         try {
             const response = await fetch(`/admin/api/users/${deleteUserId}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await response.json();
-            
+
             if (data.success) {
                 showToast(data.message, 'success');
                 // Remove row from table
@@ -780,10 +810,10 @@
     });
 
     // Search functionality
-    document.getElementById('search-input').addEventListener('input', function() {
+    document.getElementById('search-input').addEventListener('input', function () {
         const query = this.value.toLowerCase();
         const rows = document.querySelectorAll('#users-table-body tr');
-        
+
         rows.forEach(row => {
             const username = row.dataset.username;
             const email = row.dataset.email;
@@ -794,22 +824,22 @@
 
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
-            
+
             const filter = this.dataset.filter;
             const rows = document.querySelectorAll('#users-table-body tr');
-            
+
             rows.forEach(row => {
                 const isAdmin = row.dataset.isAdmin === 'True';
                 const isActive = row.dataset.isActive === 'True';
-                
+
                 let show = true;
                 if (filter === 'admin') show = isAdmin;
                 else if (filter === 'user') show = !isAdmin;
                 else if (filter === 'inactive') show = !isActive;
-                
+
                 row.style.display = show ? '' : 'none';
             });
         });
@@ -819,29 +849,26 @@
     function updateStats() {
         const rows = document.querySelectorAll('#users-table-body tr');
         let total = 0, admins = 0, active = 0;
-        
+
         rows.forEach(row => {
             total++;
             if (row.dataset.isAdmin === 'True') admins++;
             if (row.dataset.isActive === 'True') active++;
         });
-        
+
         document.getElementById('total-count').textContent = total;
         document.getElementById('admin-count').textContent = admins;
         document.getElementById('active-count').textContent = active;
     }
 
     // Close modal on outside click
-    document.getElementById('delete-modal').addEventListener('click', function(e) {
+    document.getElementById('delete-modal').addEventListener('click', function (e) {
         if (e.target === this) closeDeleteModal();
     });
 
     // Close modal on Escape key
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeDeleteModal();
     });
 </script>
 {% endblock %}
-
-
-
