@@ -431,3 +431,4 @@ class TestGeneticRiskProfileModel:
         assert 'APOE ε2 allele' in retrieved_factors
 
 
+

@@ -534,6 +534,7 @@ def generate_pdf_by_sample(sample_id):
     from services.pdf_service import generate_medical_report, get_report_filename
     
     # Find the most recent analysis for this sample
+    print(f"🔍 PDF Request: Looking for sample_id={sample_id}")
     query = AnalysisHistory.query.filter_by(sample_id=sample_id)
     
     if current_user.is_authenticated:
@@ -543,7 +544,32 @@ def generate_pdf_by_sample(sample_id):
     
     analysis = query.order_by(desc(AnalysisHistory.created_at)).first()
     
+    # If not found, try partial match (sample_id might contain timestamp or extra info)
     if not analysis:
+        print(f"⚠️ No exact match, trying partial match for: {sample_id}")
+        # Try to find by basename (without extension or timestamp)
+        base_sample_id = sample_id.split('_')[0] if '_' in sample_id else sample_id
+        
+        partial_query = AnalysisHistory.query.filter(
+            AnalysisHistory.sample_id.ilike(f'%{base_sample_id}%')
+        )
+        if current_user.is_authenticated:
+            partial_query = partial_query.filter(
+                or_(AnalysisHistory.user_id == current_user.id, AnalysisHistory.user_id == None)
+            )
+        analysis = partial_query.order_by(desc(AnalysisHistory.created_at)).first()
+        
+        if analysis:
+            print(f"✅ Found via partial match: {analysis.sample_id}")
+        else:
+            # List similar sample_ids for debugging
+            similar = AnalysisHistory.query.filter(
+                AnalysisHistory.sample_id.ilike(f'%{base_sample_id[:8]}%')
+            ).limit(5).all()
+            print(f"📋 Similar sample_ids found: {[a.sample_id for a in similar]}")
+    
+    if not analysis:
+        print(f"❌ No analysis found for sample_id={sample_id}")
         return jsonify({'success': False, 'error': 'Analysis not found'}), 404
     
     # Prepare data

@@ -21,6 +21,38 @@ POPULATION_INFO = {
     "YRI": {"code": "Y", "description": "Yoruban in Ibadan, Nigeria (West Africa)"},
 }
 
+# Build reverse lookup: short code -> full population code
+SHORT_CODE_TO_POPULATION = {info["code"]: pop_code for pop_code, info in POPULATION_INFO.items()}
+
+
+def resolve_population_code(population):
+    """
+    Resolve a population code to its full form.
+    Handles both full codes (CEU, YRI) and short codes (C, Y, H).
+    
+    Args:
+        population: Population code (can be full like 'CEU' or short like 'C')
+    
+    Returns:
+        tuple: (full_code, description)
+    """
+    if not population:
+        return "Unknown", "Unknown Population"
+    
+    pop_upper = str(population).upper().strip()
+    
+    # First check if it's already a full code
+    if pop_upper in POPULATION_INFO:
+        return pop_upper, POPULATION_INFO[pop_upper]["description"]
+    
+    # Check if it's a short code
+    if pop_upper in SHORT_CODE_TO_POPULATION:
+        full_code = SHORT_CODE_TO_POPULATION[pop_upper]
+        return full_code, POPULATION_INFO[full_code]["description"]
+    
+    # Unknown population - return as is
+    return pop_upper, f"Population: {pop_upper}"
+
 
 @samples_bp.route('/list', methods=['GET'])
 def list_samples():

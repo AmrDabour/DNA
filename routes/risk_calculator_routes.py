@@ -260,26 +260,45 @@ def load_patient_data(sample_id):
 
 
 def calculate_snp_risk_score(patient_snps, disease_name):
-    """Calculate risk score based on actual SNP genotypes"""
+    """Calculate risk score based on actual SNP genotypes
+    
+    OPTIMIZED: Instead of querying MongoDB for each of 1M+ patient SNPs,
+    we query for all SNPs associated with this disease and check which
+    ones the patient has.
+    """
     matched_snps = []
     risk_score_modifier = 1.0
     
     # Get MongoDB collection
     collection = get_snp_collection()
     
-    # Normalize disease name for matching (handle different naming conventions)
+    # Normalize disease name for matching
     disease_name_lower = disease_name.lower()
     
-    # Iterate through patient's SNPs and check against MongoDB
-    for rs_id, patient_genotype in patient_snps.items():
-        # Query MongoDB for this SNP
-        snp_info = collection.find_one({'rs_id': rs_id})
+    # Build regex pattern for disease matching
+    # This allows partial matching (e.g., "cardiovascular" matches "Cardiovascular Disease")
+    disease_keywords = disease_name_lower.split()
+    
+    # Query MongoDB for all SNPs associated with this disease
+    # This is much faster than 1.3M individual queries!
+    disease_snps = list(collection.find({
+        'disease_associations': {
+            '$elemMatch': {
+                '$regex': '|'.join(disease_keywords),
+                '$options': 'i'
+            }
+        }
+    }))
+    
+    # Now check which of these disease-related SNPs the patient has
+    for snp_info in disease_snps:
+        rs_id = snp_info.get('rs_id')
         
-        if snp_info:
+        if rs_id and rs_id in patient_snps:
+            patient_genotype = patient_snps[rs_id]
             disease_assoc = snp_info.get('disease_associations', [])
             
-            # Check if this SNP is associated with the disease (case-insensitive)
-            # Support partial matching (e.g., "cardiovascular" in "Cardiovascular Disease")
+            # Verify this SNP is associated with the specific disease
             if any(disease_name_lower in assoc.lower() or assoc.lower() in disease_name_lower for assoc in disease_assoc):
                 risk_allele = snp_info.get('risk_allele', '')
                 odds_ratio = snp_info.get('odds_ratio', 1.0)

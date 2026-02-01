@@ -57,6 +57,7 @@ class MedicalReportPDF:
             user_info: Optional dict with user name and email
         """
         self.analysis = analysis_data
+        self.full_results = analysis_data.get('full_results', {})
         self.user_info = user_info or {}
         self.report_id = f"GNV-{datetime.now().strftime('%Y%m%d')}-{analysis_data.get('id', '0'):04d}"
         self.report_date = datetime.now()
@@ -222,7 +223,7 @@ class MedicalReportPDF:
         return elements
     
     def _create_patient_info_section(self):
-        """Create patient information section"""
+        """Create patient information section with optional generated portrait"""
         elements = []
         
         # Section header
@@ -242,25 +243,24 @@ class MedicalReportPDF:
         else:
             analysis_date = self.report_date.strftime('%B %d, %Y at %H:%M')
         
-        # Patient info table
+        # Patient info table (smaller width to accommodate image)
         info_data = [
-            ['Patient Name:', patient_name, 'Report Date:', self.report_date.strftime('%B %d, %Y')],
-            ['Sample ID:', sample_id, 'Report Time:', self.report_date.strftime('%H:%M')],
-            ['Analysis Date:', analysis_date, 'Status:', self.analysis.get('status', 'Completed').title()],
+            ['Patient Name:', patient_name],
+            ['Sample ID:', sample_id],
+            ['Analysis Date:', analysis_date],
+            ['Report Date:', self.report_date.strftime('%B %d, %Y %H:%M')],
+            ['Status:', self.analysis.get('status', 'Completed').title()],
         ]
         
         if patient_email:
-            info_data.append(['Email:', patient_email, '', ''])
+            info_data.append(['Email:', patient_email])
         
-        info_table = Table(info_data, colWidths=[90, 150, 90, 150])
+        info_table = Table(info_data, colWidths=[90, 200])
         info_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), self.LIGHT_BG),
             ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#64748b')),
-            ('TEXTCOLOR', (2, 0), (2, -1), colors.HexColor('#64748b')),
             ('TEXTCOLOR', (1, 0), (1, -1), self.PRIMARY_COLOR),
-            ('TEXTCOLOR', (3, 0), (3, -1), self.PRIMARY_COLOR),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (3, 0), (3, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('PADDING', (0, 0), (-1, -1), 8),
             ('BOX', (0, 0), (-1, -1), 1, self.BORDER_COLOR),
@@ -268,7 +268,59 @@ class MedicalReportPDF:
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         
-        elements.append(info_table)
+        # Check for generated portrait image
+        image_path = self.full_results.get('generated_image_path', '')
+        portrait_element = None
+        
+        if image_path:
+            # Try to find the image file
+            image_filename = os.path.basename(image_path)
+            # Check in uploads folder
+            possible_paths = [
+                os.path.join(os.getcwd(), 'uploads', image_filename),
+                os.path.join('/app/uploads', image_filename),
+                image_path
+            ]
+            
+            for img_path in possible_paths:
+                if os.path.exists(img_path):
+                    try:
+                        # Create portrait image with styling
+                        portrait_img = Image(img_path, width=120, height=150)
+                        
+                        # Wrap image in a table for border/styling
+                        portrait_data = [
+                            [portrait_img],
+                            [Paragraph('<font size="8" color="#64748b">AI Portrait</font>', 
+                                       ParagraphStyle('Center', parent=self.styles['Normal'], alignment=TA_CENTER))]
+                        ]
+                        portrait_table = Table(portrait_data, colWidths=[130])
+                        portrait_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+                            ('BOX', (0, 0), (-1, -1), 2, colors.HexColor('#bae6fd')),
+                            ('PADDING', (0, 0), (-1, -1), 5),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ]))
+                        portrait_element = portrait_table
+                        break
+                    except Exception as e:
+                        print(f"Failed to load portrait image: {e}")
+        
+        # Create main layout: info table on left, portrait on right (if available)
+        if portrait_element:
+            main_layout = Table(
+                [[info_table, portrait_element]],
+                colWidths=[310, 150]
+            )
+            main_layout.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+            ]))
+            elements.append(main_layout)
+        else:
+            elements.append(info_table)
+        
         elements.append(Spacer(1, 15))
         
         return elements
@@ -553,6 +605,124 @@ class MedicalReportPDF:
         
         return elements
     
+    def _create_health_guidance_section(self):
+        """Create AI Health Guidance section with personalized recommendations - styled like disease risk cards"""
+        elements = []
+        
+        # Get health guidance data from full_results
+        guidance_data = self.full_results.get('health_guidance', {})
+        if not guidance_data:
+            # Try to generate guidance if we have disease data
+            disease_risk = self.analysis.get('disease_risk_report', '')
+            if disease_risk:
+                try:
+                    import json
+                    from services import get_ai_health_guidance
+                    
+                    if isinstance(disease_risk, str):
+                        diseases = json.loads(disease_risk)
+                    else:
+                        diseases = disease_risk
+                    
+                    if isinstance(diseases, list) and len(diseases) > 0:
+                        gender = self.analysis.get('gender_prediction', 'Unknown')
+                        population = self.analysis.get('ancestry_prediction', 'Unknown')
+                        
+                        result = get_ai_health_guidance(diseases, gender, population)
+                        if result.get('success'):
+                            guidance_data = result.get('guidance', {})
+                except Exception as e:
+                    print(f"Could not generate health guidance for PDF: {e}")
+        
+        if not guidance_data:
+            return elements
+        
+        elements.append(Paragraph('AI Health Guidance', self.styles['SectionHeader']))
+        elements.append(Spacer(1, 8))
+        
+        # Category definitions with icons and colors (matching disease risk style)
+        categories = [
+            ('nutrition', '🍎 Nutrition & Diet', '#10b981', '#f0fdf4', '#bbf7d0', guidance_data.get('nutrition', [])),
+            ('lifestyle', '🏃 Lifestyle & Exercise', '#3b82f6', '#eff6ff', '#bfdbfe', guidance_data.get('lifestyle', [])),
+            ('screenings', '🩺 Preventive Screenings', '#8b5cf6', '#faf5ff', '#e9d5ff', guidance_data.get('screenings', [])),
+            ('wellness', '🧘 Wellness Tips', '#f59e0b', '#fffbeb', '#fde68a', guidance_data.get('wellness', []))
+        ]
+        
+        # Create cards like disease risk section
+        for cat_id, cat_name, text_color, bg_color, border_color, tips in categories:
+            if not tips:
+                continue
+            
+            # Build tips as bullet points
+            tips_text = '  •  '.join(tips[:4])
+            
+            # Create card content matching disease risk style
+            card_data = [
+                [
+                    Paragraph(f'<font size="11" color="{text_color}"><b>{cat_name}</b></font>', self.styles['Normal']),
+                    Paragraph(f'<font size="9" color="{text_color}"><b>RECOMMENDATION</b></font>', self.styles['Normal'])
+                ],
+                [
+                    Paragraph(f'<font size="9" color="#374151">• {tips[0] if len(tips) > 0 else ""}</font>', self.styles['Normal']),
+                    ''
+                ],
+                [
+                    Paragraph(f'<font size="9" color="#374151">• {tips[1] if len(tips) > 1 else ""}</font>', self.styles['Normal']),
+                    ''
+                ],
+                [
+                    Paragraph(f'<font size="9" color="#374151">• {tips[2] if len(tips) > 2 else ""}</font>', self.styles['Normal']),
+                    ''
+                ],
+            ]
+            
+            # Add 4th tip if exists
+            if len(tips) > 3:
+                card_data.append([
+                    Paragraph(f'<font size="9" color="#374151">• {tips[3]}</font>', self.styles['Normal']),
+                    ''
+                ])
+            
+            card = Table(card_data, colWidths=[360, 100])
+            card.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(bg_color)),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(border_color)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('SPAN', (0, 1), (1, 1)),
+                ('SPAN', (0, 2), (1, 2)),
+                ('SPAN', (0, 3), (1, 3)),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ]))
+            
+            elements.append(card)
+            elements.append(Spacer(1, 6))
+        
+        # Clinical note (same style as disease risk section)
+        elements.append(Spacer(1, 10))
+        note_data = [[Paragraph(
+            '<font color="#0369a1"><b>Wellness Note:</b> These recommendations are personalized based on your genetic profile '
+            'and should complement, not replace, professional medical advice. Consult your healthcare provider before making significant changes.</font>',
+            ParagraphStyle('Note', parent=self.styles['SmallText'], textColor=colors.HexColor('#0369a1'))
+        )]]
+        note_table = Table(note_data, colWidths=[480])
+        note_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f9ff')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('BOX', (0, 0), (-1, -1), 0, colors.white),
+            ('LINEBEFORE', (0, 0), (0, -1), 3, colors.HexColor('#0ea5e9')),
+        ]))
+        elements.append(note_table)
+        elements.append(Spacer(1, 15))
+        
+        return elements
+    
     def _create_analysis_metadata_section(self):
         """Create analysis metadata section"""
         elements = []
@@ -679,7 +849,15 @@ class MedicalReportPDF:
         elements.extend(self._create_patient_info_section())
         elements.extend(self._create_genetic_profile_section())
         elements.extend(self._create_physical_characteristics_section())
+        
+        # Disease Risk on Page 2 for cleaner layout
+        elements.append(PageBreak())
         elements.extend(self._create_disease_risk_section())
+        
+        # Health Guidance on Page 3
+        elements.append(PageBreak())
+        elements.extend(self._create_health_guidance_section())
+        
         # elements.extend(self._create_analysis_metadata_section())  # Removed - not needed in report
         elements.extend(self._create_disclaimer_section())
         elements.extend(self._create_footer())

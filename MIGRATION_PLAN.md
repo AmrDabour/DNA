@@ -217,14 +217,14 @@ DATABASE_URL=postgresql://genovaai_user:<password>@postgres:5432/genovaai
 │  │  │ (Flask) │  │ (Flask) │  │ (Flask) │                      │    │
 │  │  └─────────┘  └─────────┘  └─────────┘                      │    │
 │  └─────────────────────────────────────────────────────────────┘    │
-│              │                                                       │
-│              ▼                                                       │
+│              │                                                     │
+│              ▼                                                     │
 │  ┌─────────────────────┐      ┌─────────────────────┐              │
 │  │  PostgreSQL Service │      │  Redis Service      │              │
 │  │  (ClusterIP)        │      │  (ClusterIP)        │              │
 │  └─────────────────────┘      └─────────────────────┘              │
-│              │                        │                              │
-│              ▼                        ▼                              │
+│              │                        │                            │
+│              ▼                        ▼                            │
 │  ┌─────────────────────┐      ┌─────────────────────┐              │
 │  │  PostgreSQL         │      │  Redis              │              │
 │  │  StatefulSet        │      │  StatefulSet        │              │

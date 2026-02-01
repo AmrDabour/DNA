@@ -215,3 +215,4 @@ def generate_full_report(file_path: str, **kwargs) -> Dict[str, Any]:
         return generate_full_report_task(file_path, **kwargs)
 
 
+

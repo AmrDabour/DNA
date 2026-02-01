@@ -13,11 +13,59 @@ POPULATION_INFO = {
     "GIH": {"description": "Gujarati Indians in Houston, Texas", "region": "South Asia"},
     "ASW": {"description": "African Ancestry in Southwest USA", "region": "Americas"},
     "MXL": {"description": "Mexican Ancestry in Los Angeles, California", "region": "Americas"},
+    "MEX": {"description": "Mexican Ancestry in Los Angeles, California", "region": "Americas"},
     "TSI": {"description": "Toscani in Italia", "region": "Europe"},
     "LWK": {"description": "Luhya in Webuye, Kenya", "region": "Africa"},
     "CHD": {"description": "Chinese in Metropolitan Denver, Colorado", "region": "Americas"},
     "MKK": {"description": "Maasai in Kinyawa, Kenya", "region": "Africa"},
 }
+
+# Short code to full population code mapping
+# This maps single-letter codes (used in some data files) to full population codes
+SHORT_CODE_TO_POPULATION = {
+    "A": "ASW",  # African ancestry in Southwest USA
+    "C": "CEU",  # Utah residents with Northern and Western European ancestry
+    "H": "CHB",  # Han Chinese in Beijing, China
+    "D": "CHD",  # Chinese in Metropolitan Denver, Colorado
+    "G": "GIH",  # Gujarati Indians in Houston, Texas
+    "J": "JPT",  # Japanese in Tokyo, Japan
+    "L": "LWK",  # Luhya in Webuye, Kenya
+    "M": "MEX",  # Mexican ancestry in Los Angeles, California
+    "K": "MKK",  # Maasai in Kinyawa, Kenya
+    "T": "TSI",  # Tuscan in Italy
+    "Y": "YRI",  # Yoruban in Ibadan, Nigeria
+}
+
+
+def resolve_population_code(population):
+    """
+    Resolve a population code to its full form.
+    Handles both full codes (CEU, YRI) and short codes (C, Y, H).
+    
+    Args:
+        population: Population code (can be full like 'CEU' or short like 'C')
+    
+    Returns:
+        tuple: (full_code, description, region)
+    """
+    if not population:
+        return "Unknown", "Unknown Population", "Unknown"
+    
+    pop_upper = str(population).upper().strip()
+    
+    # First check if it's already a full code
+    if pop_upper in POPULATION_INFO:
+        info = POPULATION_INFO[pop_upper]
+        return pop_upper, info.get("description", pop_upper), info.get("region", "Unknown")
+    
+    # Check if it's a short code
+    if pop_upper in SHORT_CODE_TO_POPULATION:
+        full_code = SHORT_CODE_TO_POPULATION[pop_upper]
+        info = POPULATION_INFO.get(full_code, {})
+        return full_code, info.get("description", full_code), info.get("region", "Unknown")
+    
+    # Unknown population - return as is
+    return pop_upper, f"Population: {pop_upper}", "Unknown"
 
 
 def configure_gemini():
@@ -80,9 +128,8 @@ def get_physical_characteristics(gender_prediction, ancestry_prediction):
         # Normalize population code
         population = population.upper() if population else "Unknown"
         
-        pop_info = POPULATION_INFO.get(population, {})
-        pop_description = pop_info.get("description", population)
-        region = pop_info.get("region", "Unknown Region")
+        # Use resolve_population_code to handle both full codes (CEU) and short codes (C, H)
+        population, pop_description, region = resolve_population_code(population)
         
         print(f"🔍 Physical Characteristics: Gender={gender}, Population={population}, Description={pop_description}")
         
@@ -198,20 +245,55 @@ def get_genetic_disease_risk(gender_prediction, ancestry_prediction, patient_id=
         
         population = population.upper() if population else "Unknown"
         
-        pop_info = POPULATION_INFO.get(population, {})
-        pop_description = pop_info.get("description", population)
-        region = pop_info.get("region", "Unknown")
+        # Use resolve_population_code to handle both full codes (CEU) and short codes (C, H)
+        population, pop_description, region = resolve_population_code(population)
         
         print(f"🔍 Disease Risk: Gender={gender}, Population={population}, Description={pop_description}")
         
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name=model_name)
         
-        prompt = f"""You are a genetics expert. Based on population genetics, list 5 genetic disease risks for:
+        prompt = f"""You are a genetics expert. Based on population genetics, assess disease risks for:
 
 Gender: {gender}
 Population: {population} ({pop_description})
 Region: {region}
+
+ONLY SELECT FROM THESE DISEASES:
+- Alzheimer's disease
+- Parkinson's disease
+- Cancer susceptibility
+- ADHD (Attention Deficit Hyperactivity Disorder)
+- Colorectal cancer
+- Prostate cancer
+- Breast cancer
+- Lung cancer
+- Heart attack (Myocardial infarction)
+- Coronary artery disease
+- Stroke
+- Type 2 diabetes
+- Type 1 diabetes
+- Obesity
+- Hypertension (High blood pressure)
+- Asthma
+- Depression
+- Bipolar disorder
+- Schizophrenia
+- Anxiety disorders
+- Celiac disease
+- Crohn's disease
+- Lupus (Systemic lupus erythematosus)
+- Rheumatoid arthritis
+- Multiple sclerosis
+- Osteoporosis
+- Thyroid disorders
+- Autism spectrum disorder
+- Epilepsy
+- Age-related macular degeneration
+- Glaucoma
+- Sickle cell disease
+- Cystic fibrosis
+- Hemophilia
 
 Return ONLY valid JSON (no markdown, no code blocks):
 {{
@@ -227,11 +309,11 @@ Return ONLY valid JSON (no markdown, no code blocks):
 }}
 
 Rules:
-- Include exactly 5 diseases
-- "risk" must be exactly: "high", "moderate", or "low"
-- Use REAL diseases with documented genetic links to {population} population
-- Include REAL gene names
-- Use REAL prevalence percentages from scientific literature
+- Select 5 diseases from the list above that are most relevant to {gender} and {population} population
+- "risk" must be exactly: "high", "moderate", or "low" and donot make all disease from one risk level
+- Use REAL gene names associated with each disease
+- Use REAL prevalence percentages from scientific literature for {population} population
+- For gender-specific diseases (Prostate cancer for males, Breast cancer for females), only include if appropriate
 - Keep description to ONE sentence"""
 
         response = model.generate_content(prompt)
@@ -351,4 +433,4 @@ Rules:
         return {"success": False, "error": str(e)}
 
 
-__all__ = ['configure_gemini', 'get_physical_characteristics', 'get_genetic_disease_risk', 'get_ai_health_guidance', 'POPULATION_INFO']
+__all__ = ['configure_gemini', 'get_physical_characteristics', 'get_genetic_disease_risk', 'get_ai_health_guidance', 'POPULATION_INFO', 'SHORT_CODE_TO_POPULATION', 'resolve_population_code']

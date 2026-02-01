@@ -8,7 +8,7 @@ import os
 import json
 import google.generativeai as genai
 from . import predictions_bp
-from .samples_routes import POPULATION_INFO
+from .samples_routes import POPULATION_INFO, resolve_population_code
 from database.models import db, AnalysisHistory
 from sqlalchemy import or_
 

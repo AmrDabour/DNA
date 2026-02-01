@@ -458,3 +458,4 @@ class TestFormattingUtils:
         assert 'No Disease Risk Data' in html or 'No specific disease' in html
 
 
+
