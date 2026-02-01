@@ -1,0 +1,422 @@
+# ============================================================
+# GenovaAI - Release & Deployment Pipeline
+# ============================================================
+# Complete CD pipeline including:
+# - Semantic versioning
+# - Multi-arch Docker builds
+# - Image signing (Cosign)
+# - Helm chart packaging
+# - Deployment to multiple environments
+# - Smoke tests
+# - Rollback capabilities
+# ============================================================
+name: Release & Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to deploy (e.g., v1.2.3)'
+        required: false
+        type: string
+      skip_tests:
+        description: 'Skip pre-deployment tests'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: amrdabour/genovaai
+  GKE_CLUSTER: genovaai-cluster
+  GKE_REGION: us-central1
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  # ============================================================
+  # Pre-Release Validation
+  # ============================================================
+  validate:
+    name: Pre-Release Validation
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ inputs.version }}" != "" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.ref_type }}" == "tag" ]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="v0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run quick validation tests
+        run: |
+          pytest tests/ -v -x --timeout=120 -k "not slow"
+        continue-on-error: true
+
+      - name: Verify ML models
+        run: python verify_models.py
+
+  # ============================================================
+  # Build & Push Docker Image
+  # ============================================================
+  build:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    needs: validate
+    if: always() && (needs.validate.result == 'success' || needs.validate.result == 'skipped')
+    
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
+      image_tag: ${{ steps.meta.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version || github.ref_name }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VCS_REF=${{ github.sha }}
+          provenance: true
+          sbom: true
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          format: spdx-json
+          output-file: sbom.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+
+  # ============================================================
+  # Sign Container Image
+  # ============================================================
+  sign:
+    name: Sign Image
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image with Cosign
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          cosign sign --yes ${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image_digest }}
+        continue-on-error: true
+
+  # ============================================================
+  # Security Scan Release Image
+  # ============================================================
+  scan-release:
+    name: Scan Release Image
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}'
+          format: 'sarif'
+          output: 'trivy-release.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-release.sarif
+
+      - name: Check for critical vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}'
+          format: 'table'
+          severity: 'CRITICAL'
+          exit-code: '1'
+        continue-on-error: true
+
+  # ============================================================
+  # Deploy to Staging
+  # ============================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, scan-release]
+    if: github.event_name == 'push' || inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.genovaai.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }}-staging \
+            --region ${{ env.GKE_REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Update image tag in manifests
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/genovaai.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/celery-worker.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/celery-beat.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/flower.yaml
+
+      - name: Deploy to staging
+        run: |
+          kubectl apply -k kubernetes-manifests/ -n genovaai-staging
+          kubectl rollout status deployment/genovaai -n genovaai-staging --timeout=300s
+
+      - name: Run smoke tests
+        run: |
+          STAGING_URL=$(kubectl get svc nginx -n genovaai-staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          
+          # Health check
+          curl -f "http://$STAGING_URL/health" || exit 1
+          
+          # API check
+          curl -f "http://$STAGING_URL/api/v1/status" || exit 1
+          
+          echo "✅ Smoke tests passed"
+        continue-on-error: true
+
+  # ============================================================
+  # Deploy to Production
+  # ============================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://genovaai.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region ${{ env.GKE_REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Create rollback snapshot
+        run: |
+          # Save current deployment for rollback
+          kubectl get deployment genovaai -n genovaai -o yaml > rollback-deployment.yaml
+          echo "Current image: $(kubectl get deployment genovaai -n genovaai -o jsonpath='{.spec.template.spec.containers[0].image}')"
+
+      - name: Upload rollback snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-snapshot
+          path: rollback-deployment.yaml
+          retention-days: 7
+
+      - name: Update image tag
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/genovaai.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/celery-worker.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/celery-beat.yaml
+          sed -i "s|image: amrdabour/genovaai:.*|image: amrdabour/genovaai:$IMAGE_TAG|g" kubernetes-manifests/flower.yaml
+
+      - name: Deploy to production (Blue-Green)
+        run: |
+          # Apply with rolling update strategy
+          kubectl apply -k kubernetes-manifests/ -n genovaai
+          
+          # Wait for rollout
+          kubectl rollout status deployment/genovaai -n genovaai --timeout=600s
+
+      - name: Run production smoke tests
+        run: |
+          PROD_URL=$(kubectl get svc nginx -n genovaai -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          
+          # Health check
+          for i in {1..5}; do
+            if curl -sf "http://$PROD_URL/health"; then
+              echo "✅ Health check passed"
+              break
+            fi
+            sleep 10
+          done
+          
+          # API check
+          curl -f "http://$PROD_URL/api/v1/status" || echo "⚠️ API check failed"
+        continue-on-error: true
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.build.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Digest**: ${{ needs.build.outputs.image_digest }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================
+  # Create GitHub Release
+  # ============================================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build, deploy-production]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom
+
+      - name: Generate changelog
+        id: changelog
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: cliff.toml
+          args: --latest
+        continue-on-error: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## What's Changed
+            
+            ${{ steps.changelog.outputs.content || 'See commit history for changes.' }}
+            
+            ## Docker Image
+            
+            ```bash
+            docker pull ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ```
+            
+            ## Artifacts
+            
+            - SBOM (Software Bill of Materials) attached below
+          files: |
+            sbom.json
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

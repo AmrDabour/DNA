@@ -1,0 +1,201 @@
+# ============================================================
+# GenovaAI - Documentation & Changelog Generation
+# ============================================================
+# Automated documentation tasks:
+# - API documentation generation
+# - Changelog generation
+# - README badge updates
+# - Documentation site deployment
+# ============================================================
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - '*.md'
+      - 'routes/**'
+      - 'app.py'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # Generate API Documentation
+  # ============================================================
+  api-docs:
+    name: Generate API Docs
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install sphinx sphinx-rtd-theme sphinxcontrib-openapi pdoc3
+
+      - name: Generate OpenAPI spec
+        run: |
+          # Generate OpenAPI spec from Flask app
+          python -c "
+          from app import app
+          import json
+          
+          # If using Flask-RESTX or similar
+          # spec = app.extensions.get('flask-restx', {}).get('spec', {})
+          
+          # Placeholder spec
+          spec = {
+              'openapi': '3.0.0',
+              'info': {
+                  'title': 'GenovaAI API',
+                  'version': '1.0.0',
+                  'description': 'DNA Analysis Platform API'
+              },
+              'paths': {}
+          }
+          
+          with open('docs/openapi.json', 'w') as f:
+              json.dump(spec, f, indent=2)
+          "
+        continue-on-error: true
+
+      - name: Generate Python docs
+        run: |
+          pdoc --html --output-dir docs/api --force \
+            ml_models \
+            routes \
+            services \
+            utils
+        continue-on-error: true
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-documentation
+          path: docs/
+
+  # ============================================================
+  # Generate Changelog
+  # ============================================================
+  changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog with git-cliff
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+
+      - name: Commit changelog
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'docs: update CHANGELOG.md'
+          file_pattern: 'CHANGELOG.md'
+
+  # ============================================================
+  # Update README Badges
+  # ============================================================
+  badges:
+    name: Update Badges
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update coverage badge
+        run: |
+          # Generate coverage badge
+          # This would integrate with your coverage reporting
+          echo "Coverage badge update placeholder"
+
+      - name: Update test badge
+        run: |
+          # Update test status badge
+          echo "Test badge update placeholder"
+
+  # ============================================================
+  # Deploy Documentation Site
+  # ============================================================
+  deploy-docs:
+    name: Deploy Docs Site
+    runs-on: ubuntu-latest
+    needs: api-docs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MkDocs
+        run: |
+          pip install mkdocs mkdocs-material mkdocstrings[python]
+
+      - name: Build documentation
+        run: |
+          # Create mkdocs.yml if not exists
+          if [ ! -f mkdocs.yml ]; then
+            cat > mkdocs.yml << 'EOF'
+          site_name: GenovaAI Documentation
+          site_description: DNA Analysis Platform Documentation
+          repo_url: https://github.com/AmrDabour/DNA
+          
+          theme:
+            name: material
+            palette:
+              primary: indigo
+              accent: indigo
+          
+          nav:
+            - Home: index.md
+            - Getting Started: getting-started.md
+            - API Reference: api/index.md
+            - Deployment: deployment.md
+          
+          plugins:
+            - search
+            - mkdocstrings
+          EOF
+          fi
+          
+          # Create docs index if not exists
+          mkdir -p docs
+          if [ ! -f docs/index.md ]; then
+            cp README.md docs/index.md
+          fi
+          
+          mkdocs build
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+        continue-on-error: true

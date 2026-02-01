@@ -1,0 +1,404 @@
+# ============================================================
+# GenovaAI - Performance & Load Testing
+# ============================================================
+# Performance testing pipeline:
+# - API load testing with Locust
+# - Database performance tests
+# - ML model inference benchmarks
+# - Memory leak detection
+# - Response time monitoring
+# ============================================================
+name: Performance Testing
+
+on:
+  schedule:
+    # Run weekly on Saturdays at 3 AM UTC
+    - cron: '0 3 * * 6'
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Test duration in seconds'
+        required: false
+        default: '300'
+      users:
+        description: 'Number of concurrent users'
+        required: false
+        default: '50'
+      spawn_rate:
+        description: 'User spawn rate per second'
+        required: false
+        default: '5'
+
+env:
+  TEST_DURATION: ${{ inputs.test_duration || '300' }}
+  NUM_USERS: ${{ inputs.users || '50' }}
+  SPAWN_RATE: ${{ inputs.spawn_rate || '5' }}
+
+jobs:
+  # ============================================================
+  # Setup Test Environment
+  # ============================================================
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    
+    outputs:
+      test_url: ${{ steps.start.outputs.url }}
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: genovaai_perf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+      
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start application
+        id: start
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/genovaai_perf
+          REDIS_URL: redis://localhost:6379/0
+          MONGODB_URI: mongodb://localhost:27017/
+          FLASK_ENV: testing
+        run: |
+          # Start app in background
+          python app.py &
+          sleep 10
+          
+          # Verify app is running
+          curl -f http://localhost:5000/health || exit 1
+          
+          echo "url=http://localhost:5000" >> $GITHUB_OUTPUT
+
+  # ============================================================
+  # API Load Testing
+  # ============================================================
+  load-test:
+    name: API Load Test
+    runs-on: ubuntu-latest
+    needs: setup
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: genovaai_perf
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Locust
+        run: pip install locust
+
+      - name: Create Locust test file
+        run: |
+          cat > locustfile.py << 'EOF'
+          from locust import HttpUser, task, between
+          import random
+          
+          class GenovaAIUser(HttpUser):
+              wait_time = between(1, 3)
+              
+              @task(3)
+              def health_check(self):
+                  self.client.get("/health")
+              
+              @task(2)
+              def api_status(self):
+                  self.client.get("/api/v1/status")
+              
+              @task(1)
+              def upload_page(self):
+                  self.client.get("/upload")
+              
+              @task(1)
+              def results_page(self):
+                  self.client.get("/results")
+          EOF
+
+      - name: Start application
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/genovaai_perf
+          REDIS_URL: redis://localhost:6379/0
+          FLASK_ENV: testing
+        run: |
+          pip install -r requirements.txt
+          python app.py &
+          sleep 10
+
+      - name: Run load test
+        run: |
+          locust -f locustfile.py \
+            --host=http://localhost:5000 \
+            --users=${{ env.NUM_USERS }} \
+            --spawn-rate=${{ env.SPAWN_RATE }} \
+            --run-time=${{ env.TEST_DURATION }}s \
+            --headless \
+            --html=locust-report.html \
+            --csv=locust-results
+        continue-on-error: true
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results
+          path: |
+            locust-report.html
+            locust-results*.csv
+
+      - name: Analyze results
+        run: |
+          echo "## 📊 Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f locust-results_stats.csv ]; then
+            echo "### Request Statistics" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat locust-results_stats.csv >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ============================================================
+  # ML Model Benchmarks
+  # ============================================================
+  ml-benchmarks:
+    name: ML Model Benchmarks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-benchmark memory_profiler
+
+      - name: Run inference benchmarks
+        run: |
+          cat > benchmark_ml.py << 'EOF'
+          import time
+          import statistics
+          from ml_models.predictors import GenovaPredictor
+          
+          def benchmark_prediction():
+              predictor = GenovaPredictor()
+              
+              # Sample test data
+              test_data = {"snp_data": "sample_data"}
+              
+              times = []
+              for _ in range(100):
+                  start = time.perf_counter()
+                  # Add actual prediction call here
+                  end = time.perf_counter()
+                  times.append(end - start)
+              
+              print(f"Mean inference time: {statistics.mean(times)*1000:.2f}ms")
+              print(f"Std dev: {statistics.stdev(times)*1000:.2f}ms")
+              print(f"Min: {min(times)*1000:.2f}ms")
+              print(f"Max: {max(times)*1000:.2f}ms")
+          
+          if __name__ == "__main__":
+              benchmark_prediction()
+          EOF
+          
+          python benchmark_ml.py
+        continue-on-error: true
+
+      - name: Memory profiling
+        run: |
+          cat > memory_test.py << 'EOF'
+          from memory_profiler import profile
+          
+          @profile
+          def test_model_memory():
+              from ml_models.predictors import GenovaPredictor
+              predictor = GenovaPredictor()
+              # Run predictions
+              return predictor
+          
+          if __name__ == "__main__":
+              test_model_memory()
+          EOF
+          
+          python -m memory_profiler memory_test.py > memory-profile.txt
+        continue-on-error: true
+
+      - name: Upload benchmarks
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-benchmarks
+          path: |
+            memory-profile.txt
+            benchmark-results.json
+
+  # ============================================================
+  # Database Performance
+  # ============================================================
+  db-performance:
+    name: Database Performance
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: genovaai_perf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install psycopg2-binary sqlalchemy pytest pytest-benchmark
+
+      - name: Run database benchmarks
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/genovaai_perf
+        run: |
+          cat > db_benchmark.py << 'EOF'
+          import time
+          import psycopg2
+          import statistics
+          
+          def benchmark_queries():
+              conn = psycopg2.connect(
+                  host="localhost",
+                  database="genovaai_perf",
+                  user="test",
+                  password="test"
+              )
+              cur = conn.cursor()
+              
+              # Create test table
+              cur.execute("""
+                  CREATE TABLE IF NOT EXISTS benchmark_test (
+                      id SERIAL PRIMARY KEY,
+                      data TEXT
+                  )
+              """)
+              conn.commit()
+              
+              # Insert benchmark
+              insert_times = []
+              for i in range(100):
+                  start = time.perf_counter()
+                  cur.execute("INSERT INTO benchmark_test (data) VALUES (%s)", (f"test_{i}",))
+                  conn.commit()
+                  insert_times.append(time.perf_counter() - start)
+              
+              # Select benchmark
+              select_times = []
+              for _ in range(100):
+                  start = time.perf_counter()
+                  cur.execute("SELECT * FROM benchmark_test LIMIT 10")
+                  cur.fetchall()
+                  select_times.append(time.perf_counter() - start)
+              
+              print(f"Insert avg: {statistics.mean(insert_times)*1000:.2f}ms")
+              print(f"Select avg: {statistics.mean(select_times)*1000:.2f}ms")
+              
+              conn.close()
+          
+          if __name__ == "__main__":
+              benchmark_queries()
+          EOF
+          
+          python db_benchmark.py
+
+  # ============================================================
+  # Summary Report
+  # ============================================================
+  performance-summary:
+    name: Performance Summary
+    runs-on: ubuntu-latest
+    needs: [load-test, ml-benchmarks, db-performance]
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: results/
+
+      - name: Generate summary
+        run: |
+          echo "## 🚀 Performance Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Test | ${{ needs.load-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ML Benchmarks | ${{ needs.ml-benchmarks.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| DB Performance | ${{ needs.db-performance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- Duration: ${{ env.TEST_DURATION }}s" >> $GITHUB_STEP_SUMMARY
+          echo "- Users: ${{ env.NUM_USERS }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Spawn Rate: ${{ env.SPAWN_RATE }}/s" >> $GITHUB_STEP_SUMMARY

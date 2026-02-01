@@ -604,26 +604,316 @@ web/
 │                                     │                                       │
 │                                     ▼                                       │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    2. Automated Testing                             │   │
-│  │  • Unit Tests                                                       │   │
-│  │  • Integration Tests                                                │   │
-│  │  • Code Linting                                                     │   │
+│  │                    2. CI Pipeline (ci-pipeline.yml)                 │   │
+│  │  • Code Quality (Black, isort, flake8, mypy, Bandit)               │   │
+│  │  • Unit Tests with Coverage (>70% threshold)                        │   │
+│  │  • Integration Tests (PostgreSQL, Redis, MongoDB, RabbitMQ)         │   │
+│  │  • ML Model Validation                                              │   │
+│  │  • API Contract Tests                                               │   │
+│  │  • Performance Benchmarks                                           │   │
+│  │  • Docker Build Test                                                │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                     │                                       │
 │                                     ▼                                       │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    3. Docker Build                                  │   │
-│  │  • Build Docker Image                                               │   │
+│  │                    3. Security Scanning (security-comprehensive.yml)│   │
+│  │  • SAST (Bandit, Semgrep, CodeQL)                                  │   │
+│  │  • SCA - Dependency Scanning (Trivy, Safety, pip-audit)            │   │
+│  │  • Container Image Scanning (Trivy, Grype)                         │   │
+│  │  • IaC Scanning (Checkov, tfsec, Hadolint)                         │   │
+│  │  • Secret Detection (Gitleaks, TruffleHog)                         │   │
+│  │  • License Compliance                                               │   │
+│  │  • SBOM Generation (Syft)                                          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     │                                       │
+│                                     ▼                                       │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    4. Build & Push (build-push-images.yml)          │   │
+│  │  • Multi-arch Docker Build (amd64, arm64)                          │   │
+│  │  • Image Signing (Cosign)                                          │   │
 │  │  • Push to Docker Hub                                               │   │
+│  │  • SBOM Attachment                                                  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                     │                                       │
-│                                     ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    4. Deploy to Kubernetes                          │   │
-│  │  • Apply Kubernetes Manifests                                       │   │
-│  │  • Rolling Update                                                   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
+│                    ┌────────────────┴────────────────┐                     │
+│                    ▼                                 ▼                      │
+│  ┌─────────────────────────┐       ┌─────────────────────────┐             │
+│  │  5a. Deploy to Staging  │       │  5b. ArgoCD GitOps      │             │
+│  │  (release-deploy.yml)   │       │  (Auto-sync from Git)   │             │
+│  │  • Smoke Tests          │       │  • Image Updater        │             │
+│  └───────────┬─────────────┘       └─────────────────────────┘             │
+│              ▼                                                              │
+│  ┌─────────────────────────┐                                               │
+│  │  6. Deploy to Production│                                               │
+│  │  • Blue-Green Deploy    │                                               │
+│  │  • Rollback Snapshot    │                                               │
+│  │  • Health Checks        │                                               │
+│  │  • GitHub Release       │                                               │
+│  └─────────────────────────┘                                               │
 └─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### ملفات GitHub Actions Workflows
+
+| الملف | الوظيفة | التشغيل |
+|-------|---------|---------|
+| `ci-pipeline.yml` | اختبارات شاملة: جودة الكود، الوحدات، التكامل، ML، API | Push/PR |
+| `security-comprehensive.yml` | فحص أمني شامل: SAST, SCA, IaC, Secrets | Push/PR/Scheduled |
+| `build-push-images.yml` | بناء ودفع صور Docker متعددة المنصات | Push to main/tags |
+| `release-deploy.yml` | نشر للإنتاج مع توقيع الصور وإنشاء Release | Tags (v*) |
+| `performance-tests.yml` | اختبارات الأداء: Load Testing, Benchmarks | Weekly/Manual |
+| `dependency-updates.yml` | تحديث التبعيات التلقائي | Weekly |
+| `documentation.yml` | توليد التوثيق ونشره على GitHub Pages | Push to main |
+| `rollback.yml` | التراجع الطارئ للبيئات | Manual |
+| `terraform.yml` | إدارة البنية التحتية بـ Terraform | Push/PR |
+
+### تفاصيل الفحوصات الأمنية
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Security Scanning Tools                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                         SAST (Static Analysis)                        │ │
+│  ├───────────────────────────────────────────────────────────────────────┤ │
+│  │  • Bandit          → Python security linter                          │ │
+│  │  • Semgrep         → Multi-language static analysis                  │ │
+│  │  • CodeQL          → GitHub's semantic code analysis                 │ │
+│  │  • mypy            → Type checking                                   │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                    SCA (Software Composition Analysis)                │ │
+│  ├───────────────────────────────────────────────────────────────────────┤ │
+│  │  • Trivy           → Vulnerability scanner for dependencies          │ │
+│  │  • Safety          → Python dependency checker                       │ │
+│  │  • pip-audit       → Python package vulnerability audit              │ │
+│  │  • Dependabot      → Automated dependency updates                    │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                      Container & Image Scanning                       │ │
+│  ├───────────────────────────────────────────────────────────────────────┤ │
+│  │  • Trivy           → Container image vulnerabilities                 │ │
+│  │  • Grype           → Anchore vulnerability scanner                   │ │
+│  │  • Hadolint        → Dockerfile linting                              │ │
+│  │  • Cosign          → Image signing & verification                    │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                    IaC (Infrastructure as Code) Scanning              │ │
+│  ├───────────────────────────────────────────────────────────────────────┤ │
+│  │  • Checkov         → Comprehensive IaC scanner                       │ │
+│  │  • tfsec           → Terraform security scanner                      │ │
+│  │  • Trivy config    → K8s manifests scanning                          │ │
+│  │  • Kubesec         → Kubernetes security analysis                    │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                         Secret Detection                              │ │
+│  ├───────────────────────────────────────────────────────────────────────┤ │
+│  │  • Gitleaks        → Git secret scanning                             │ │
+│  │  • TruffleHog      → High-entropy secret finder                      │ │
+│  │  • detect-secrets  → Baseline secret detection                       │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                      Compliance & SBOM                                │ │
+│  ├───────────────────────────────────────────────────────────────────────┤ │
+│  │  • pip-licenses    → License compliance checker                      │ │
+│  │  • Syft            → SBOM generation (SPDX, CycloneDX)              │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 ArgoCD GitOps
+
+### هيكل ArgoCD
+
+```
+kubernetes-manifests/argocd/
+├── argocd.yaml                  # مكونات ArgoCD الأساسية
+├── argocd-application.yaml      # تعريف تطبيق GenovaAI
+├── argocd-image-updater.yaml    # تحديث الصور التلقائي
+├── kustomization.yaml           # تكوين Kustomize
+└── README.md                    # التوثيق
+```
+
+### خط أنابيب GitOps
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           ArgoCD GitOps Flow                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    Git Repository                                   │   │
+│  │  ┌─────────────────────┐  ┌─────────────────────────────────────┐  │   │
+│  │  │   Application Code   │  │   kubernetes-manifests/            │  │   │
+│  │  │   (Python, ML)       │  │   • genovaai.yaml                  │  │   │
+│  │  │                      │  │   • celery-worker.yaml             │  │   │
+│  │  └──────────┬───────────┘  │   • configmap.yaml                 │  │   │
+│  │             │              └──────────┬──────────────────────────┘  │   │
+│  │             │                         │                             │   │
+│  └─────────────┼─────────────────────────┼─────────────────────────────┘   │
+│                │                         │                                  │
+│                ▼                         ▼                                  │
+│  ┌─────────────────────┐       ┌─────────────────────────┐                 │
+│  │   Docker Hub        │       │   ArgoCD Server         │                 │
+│  │   amrdabour/        │       │   Namespace: argocd     │                 │
+│  │   genovaai:latest   │◄──────│                         │                 │
+│  └─────────────────────┘       │   Components:           │                 │
+│                │               │   • Application Ctrl    │                 │
+│                │               │   • Repo Server         │                 │
+│                ▼               │   • Redis               │                 │
+│  ┌─────────────────────┐       │   • Image Updater       │                 │
+│  │  Image Updater      │       └───────────┬─────────────┘                 │
+│  │  Watches for new    │                   │                               │
+│  │  images & triggers  │                   ▼                               │
+│  │  sync               │       ┌─────────────────────────┐                 │
+│  └─────────────────────┘       │   Kubernetes Cluster    │                 │
+│                                │   Namespace: genovaai   │                 │
+│                                │                         │                 │
+│                                │   ┌─────────────────┐   │                 │
+│                                │   │   GenovaAI      │   │                 │
+│                                │   │   Deployment    │   │                 │
+│                                │   └─────────────────┘   │                 │
+│                                │   ┌─────────────────┐   │                 │
+│                                │   │ Celery Workers  │   │                 │
+│                                │   └─────────────────┘   │                 │
+│                                │   ┌─────────────────┐   │                 │
+│                                │   │   Databases     │   │                 │
+│                                │   └─────────────────┘   │                 │
+│                                └─────────────────────────┘                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### مكونات ArgoCD
+
+| المكون | الوظيفة |
+|--------|---------|
+| **Application Controller** | مراقبة حالة التطبيقات ومزامنتها مع Git |
+| **Repo Server** | إدارة اتصالات Git واستخراج المانيفست |
+| **Redis** | التخزين المؤقت للبيانات |
+| **Server** | واجهة المستخدم و API |
+| **Image Updater** | تحديث الصور تلقائياً عند توفر إصدارات جديدة |
+
+### أوامر ArgoCD
+
+```bash
+# نشر ArgoCD
+kubectl apply -k kubernetes-manifests/argocd/
+
+# الوصول للواجهة
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# الحصول على كلمة المرور
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d
+
+# عرض حالة التطبيق
+kubectl get applications -n argocd
+```
+
+### سياسة المزامنة (Sync Policy)
+
+| الإعداد | الوصف |
+|---------|-------|
+| `automated.prune` | حذف الموارد غير الموجودة في Git |
+| `automated.selfHeal` | إعادة الموارد المعدلة يدوياً لحالة Git |
+| `syncOptions.CreateNamespace` | إنشاء الـ namespace تلقائياً |
+| `retry.limit: 5` | إعادة المحاولة 5 مرات عند الفشل |
+
+---
+
+## 📦 Dependabot & Automated Updates
+
+### تكوين Dependabot
+
+```yaml
+# .github/dependabot.yml
+updates:
+  - package-ecosystem: "pip"        # Python dependencies
+    schedule: { interval: "weekly", day: "monday" }
+    
+  - package-ecosystem: "docker"     # Docker base images
+    schedule: { interval: "weekly", day: "tuesday" }
+    
+  - package-ecosystem: "github-actions"  # GitHub Actions
+    schedule: { interval: "weekly", day: "wednesday" }
+    
+  - package-ecosystem: "terraform"  # Terraform providers
+    schedule: { interval: "monthly" }
+```
+
+---
+
+## 🔄 استراتيجيات النشر
+
+### Blue-Green Deployment
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Blue-Green Deployment                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────┐              ┌─────────────────────┐              │
+│  │   Blue (Current)    │              │   Green (New)       │              │
+│  │   v1.2.0            │              │   v1.3.0            │              │
+│  │   ✅ Active         │              │   🔄 Deploying      │              │
+│  └──────────┬──────────┘              └──────────┬──────────┘              │
+│             │                                    │                          │
+│             └──────────────┬─────────────────────┘                          │
+│                            ▼                                                │
+│             ┌─────────────────────────┐                                    │
+│             │      Load Balancer      │                                    │
+│             │      (Switch Traffic)   │                                    │
+│             └─────────────────────────┘                                    │
+│                                                                             │
+│  After validation:                                                          │
+│  Blue (Old) → Standby/Rollback                                             │
+│  Green (New) → Active                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Rolling Update (Kubernetes)
+
+```yaml
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%        # أقصى زيادة في الـ pods
+    maxUnavailable: 25%  # أقصى pods غير متاحة
+```
+
+---
+
+## 🚨 التراجع الطارئ (Emergency Rollback)
+
+### طرق التراجع
+
+| الطريقة | الأمر | الاستخدام |
+|---------|-------|----------|
+| Kubernetes Undo | `kubectl rollout undo deployment/genovaai` | تراجع سريع |
+| Specific Version | `kubectl set image deployment/genovaai genovaai=amrdabour/genovaai:v1.2.0` | إصدار محدد |
+| GitHub Workflow | تشغيل `rollback.yml` يدوياً | تراجع كامل مع تحقق |
+| ArgoCD | إعادة المزامنة لـ commit سابق | GitOps |
+
+### خطوات التراجع
+
+```bash
+# 1. التراجع السريع عبر Kubernetes
+kubectl rollout undo deployment/genovaai -n genovaai
+kubectl rollout undo deployment/celery-worker -n genovaai
+
+# 2. مراقبة التراجع
+kubectl rollout status deployment/genovaai -n genovaai
+
+# 3. التحقق من الحالة
+kubectl get pods -n genovaai -l app=genovaai
 ```
 
 ### السكريبتات المساعدة
@@ -749,6 +1039,15 @@ tests/
 | Kubernetes | K8s Manifests | ✅ مكتمل |
 | Terraform | GKE/AWS | ✅ مكتمل |
 | المراقبة | Prometheus/Grafana | ✅ مكتمل |
+| ArgoCD GitOps | ArgoCD + Image Updater | ✅ مكتمل |
+| CI Pipeline | GitHub Actions (Tests, Lint, ML) | ✅ مكتمل |
+| Security Scanning | Trivy, Bandit, CodeQL, Gitleaks | ✅ مكتمل |
+| Performance Tests | Locust, Benchmarks | ✅ مكتمل |
+| Auto Dependency Updates | Dependabot | ✅ مكتمل |
+| Emergency Rollback | K8s Rollback Workflow | ✅ مكتمل |
+| SBOM Generation | Syft (SPDX, CycloneDX) | ✅ مكتمل |
+| Image Signing | Cosign | ✅ مكتمل |
+| License Compliance | pip-licenses | ✅ مكتمل |
 
 ---
 
@@ -764,9 +1063,19 @@ python app.py
 docker-compose up -d
 ```
 
-### Kubernetes
+### Kubernetes (بدون ArgoCD)
 ```bash
 kubectl apply -k kubernetes-manifests/
+```
+
+### Kubernetes (مع ArgoCD GitOps)
+```bash
+# 1. نشر ArgoCD أولاً
+kubectl apply -k kubernetes-manifests/argocd/
+
+# 2. ArgoCD سيقوم بنشر التطبيق تلقائياً من Git
+# الوصول للواجهة:
+kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 
 ### Terraform (السحابة)

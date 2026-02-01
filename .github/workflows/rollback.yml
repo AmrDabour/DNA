@@ -1,0 +1,215 @@
+# ============================================================
+# GenovaAI - Rollback Workflow
+# ============================================================
+# Emergency rollback capabilities:
+# - Quick rollback to previous version
+# - Database rollback (with caution)
+# - Kubernetes deployment rollback
+# ============================================================
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      rollback_type:
+        description: 'Type of rollback'
+        required: true
+        type: choice
+        options:
+          - kubernetes-deployment
+          - specific-version
+      target_version:
+        description: 'Target version (for specific-version rollback)'
+        required: false
+        type: string
+      confirm:
+        description: 'Type ROLLBACK to confirm'
+        required: true
+        type: string
+
+env:
+  GKE_CLUSTER: genovaai-cluster
+  GKE_REGION: us-central1
+
+jobs:
+  # ============================================================
+  # Validation
+  # ============================================================
+  validate:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "ROLLBACK" ]; then
+            echo "❌ Rollback not confirmed. Please type ROLLBACK to confirm."
+            exit 1
+          fi
+          echo "✅ Rollback confirmed"
+
+      - name: Log rollback request
+        run: |
+          echo "## 🔄 Rollback Request" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: ${{ inputs.rollback_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Version**: ${{ inputs.target_version || 'Previous' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Requested by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================
+  # Kubernetes Rollback
+  # ============================================================
+  kubernetes-rollback:
+    name: Kubernetes Rollback
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          CLUSTER_SUFFIX=""
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            CLUSTER_SUFFIX="-staging"
+          fi
+          
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }}${CLUSTER_SUFFIX} \
+            --region ${{ env.GKE_REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Get current deployment info
+        run: |
+          NAMESPACE="genovaai"
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            NAMESPACE="genovaai-staging"
+          fi
+          
+          echo "Current deployment status:"
+          kubectl get deployment genovaai -n $NAMESPACE -o wide
+          
+          echo "Rollout history:"
+          kubectl rollout history deployment/genovaai -n $NAMESPACE
+
+      - name: Perform Kubernetes rollback
+        if: inputs.rollback_type == 'kubernetes-deployment'
+        run: |
+          NAMESPACE="genovaai"
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            NAMESPACE="genovaai-staging"
+          fi
+          
+          echo "🔄 Rolling back deployment..."
+          kubectl rollout undo deployment/genovaai -n $NAMESPACE
+          kubectl rollout undo deployment/celery-worker -n $NAMESPACE
+          kubectl rollout undo deployment/celery-beat -n $NAMESPACE
+          
+          echo "⏳ Waiting for rollback to complete..."
+          kubectl rollout status deployment/genovaai -n $NAMESPACE --timeout=300s
+
+      - name: Rollback to specific version
+        if: inputs.rollback_type == 'specific-version' && inputs.target_version != ''
+        run: |
+          NAMESPACE="genovaai"
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            NAMESPACE="genovaai-staging"
+          fi
+          
+          VERSION="${{ inputs.target_version }}"
+          
+          echo "🔄 Rolling back to version: $VERSION"
+          kubectl set image deployment/genovaai genovaai=amrdabour/genovaai:$VERSION -n $NAMESPACE
+          kubectl set image deployment/celery-worker celery-worker=amrdabour/genovaai:$VERSION -n $NAMESPACE
+          kubectl set image deployment/celery-beat celery-beat=amrdabour/genovaai:$VERSION -n $NAMESPACE
+          
+          kubectl rollout status deployment/genovaai -n $NAMESPACE --timeout=300s
+
+      - name: Verify rollback
+        run: |
+          NAMESPACE="genovaai"
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            NAMESPACE="genovaai-staging"
+          fi
+          
+          echo "✅ Rollback completed. Current status:"
+          kubectl get deployment genovaai -n $NAMESPACE -o wide
+          kubectl get pods -n $NAMESPACE -l app=genovaai
+
+      - name: Run health check
+        run: |
+          NAMESPACE="genovaai"
+          if [ "${{ inputs.environment }}" == "staging" ]; then
+            NAMESPACE="genovaai-staging"
+          fi
+          
+          # Get service URL
+          URL=$(kubectl get svc nginx -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          
+          if [ -n "$URL" ]; then
+            echo "Running health check on $URL..."
+            for i in {1..5}; do
+              if curl -sf "http://$URL/health"; then
+                echo "✅ Health check passed"
+                exit 0
+              fi
+              sleep 10
+            done
+            echo "⚠️ Health check failed"
+          else
+            echo "⚠️ Could not determine service URL"
+          fi
+        continue-on-error: true
+
+  # ============================================================
+  # Notification
+  # ============================================================
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: kubernetes-rollback
+    if: always()
+    
+    steps:
+      - name: Notify on success
+        if: needs.kubernetes-rollback.result == 'success'
+        run: |
+          echo "## ✅ Rollback Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The rollback to ${{ inputs.environment }} completed successfully." >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: needs.kubernetes-rollback.result == 'failure'
+        run: |
+          echo "## ❌ Rollback Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The rollback to ${{ inputs.environment }} failed. Manual intervention may be required." >> $GITHUB_STEP_SUMMARY
+
+      # Add Slack/Teams notification here if needed
+      # - name: Send Slack notification
+      #   uses: slackapi/slack-github-action@v1
+      #   with:
+      #     payload: |
+      #       {
+      #         "text": "Rollback ${{ needs.kubernetes-rollback.result }} for ${{ inputs.environment }}"
+      #       }
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

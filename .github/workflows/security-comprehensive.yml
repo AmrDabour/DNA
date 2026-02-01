@@ -1,0 +1,472 @@
+# ============================================================
+# GenovaAI - Comprehensive Security Scanning
+# ============================================================
+# Advanced security scanning including:
+# - SAST (Static Application Security Testing)
+# - SCA (Software Composition Analysis)
+# - Container Image Scanning
+# - Infrastructure as Code Scanning
+# - Secret Detection
+# - License Compliance
+# - SBOM Generation
+# ============================================================
+name: Security & Compliance
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # ============================================================
+  # SAST - Static Application Security Testing
+  # ============================================================
+  sast-scan:
+    name: SAST Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
+        run: |
+          pip install bandit semgrep safety
+
+      - name: Run Bandit (Python Security)
+        run: |
+          bandit -r . -x ./tests,./venv,./.venv -f sarif -o bandit-results.sarif
+        continue-on-error: true
+
+      - name: Upload Bandit results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: bandit-results.sarif
+          category: bandit
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/flask
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+          generateSarif: true
+        continue-on-error: true
+
+      - name: Upload Semgrep results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  # ============================================================
+  # CodeQL Analysis
+  # ============================================================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  # ============================================================
+  # SCA - Software Composition Analysis
+  # ============================================================
+  dependency-scan:
+    name: Dependency Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install safety pip-audit
+
+      - name: Run Safety check
+        run: |
+          safety check -r requirements.txt --full-report --output json > safety-report.json
+        continue-on-error: true
+
+      - name: Run pip-audit
+        run: |
+          pip-audit -r requirements.txt --format json --output pip-audit-report.json
+        continue-on-error: true
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs.sarif'
+          severity: 'CRITICAL,HIGH'
+          vuln-type: 'library'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-dependencies
+
+      - name: Upload dependency reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-reports
+          path: |
+            safety-report.json
+            pip-audit-report.json
+
+      - name: Check for critical vulnerabilities
+        run: |
+          CRITICAL=$(cat safety-report.json 2>/dev/null | jq '[.vulnerabilities[] | select(.severity == "critical")] | length' || echo "0")
+          if [ "$CRITICAL" -gt "0" ]; then
+            echo "❌ Found $CRITICAL critical vulnerabilities!"
+            exit 1
+          fi
+          echo "✅ No critical vulnerabilities found"
+        continue-on-error: true
+
+  # ============================================================
+  # Container Image Scanning with Trivy
+  # ============================================================
+  container-scan:
+    name: Container Image Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t genovaai:security-scan .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'genovaai:security-scan'
+          format: 'sarif'
+          output: 'trivy-image.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          vuln-type: 'os,library'
+
+      - name: Upload Trivy image results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+          category: container-image
+
+      - name: Run Trivy image scan (table format)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'genovaai:security-scan'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Run Grype scanner
+        uses: anchore/scan-action@v3
+        id: grype-scan
+        with:
+          image: 'genovaai:security-scan'
+          fail-build: false
+          severity-cutoff: high
+
+      - name: Upload Grype results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: ${{ steps.grype-scan.outputs.sarif }}
+          category: grype
+
+  # ============================================================
+  # Infrastructure as Code Scanning
+  # ============================================================
+  iac-scan:
+    name: IaC Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Kubernetes manifests scanning
+      - name: Scan Kubernetes manifests with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'kubernetes-manifests/'
+          format: 'sarif'
+          output: 'trivy-k8s.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload K8s scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-k8s.sarif
+          category: kubernetes
+
+      # Kubesec scanning
+      - name: Run Kubesec
+        run: |
+          docker run --rm -v $(pwd)/kubernetes-manifests:/manifests kubesec/kubesec:v2 scan /manifests/*.yaml > kubesec-results.json || true
+        continue-on-error: true
+
+      # Terraform scanning
+      - name: Scan Terraform with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'terraform/'
+          format: 'sarif'
+          output: 'trivy-terraform.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Terraform scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-terraform.sarif
+          category: terraform
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform/
+          soft_fail: true
+          format: sarif
+          sarif_file: tfsec.sarif
+
+      - name: Upload tfsec results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: tfsec.sarif
+          category: tfsec
+
+      # Checkov comprehensive IaC scanning
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: all
+          output_format: sarif
+          output_file_path: checkov.sarif
+          soft_fail: true
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif
+          category: checkov
+
+      # Dockerfile scanning
+      - name: Run Hadolint (Dockerfile linting)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          format: sarif
+          output-file: hadolint.sarif
+          failure-threshold: error
+
+      - name: Upload Hadolint results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: hadolint.sarif
+          category: hadolint
+
+  # ============================================================
+  # Secret Detection
+  # ============================================================
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: true
+
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+        continue-on-error: true
+
+      - name: Run detect-secrets
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --all-files --baseline .secrets.baseline > secrets-scan.json || true
+        continue-on-error: true
+
+  # ============================================================
+  # License Compliance
+  # ============================================================
+  license-scan:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-licenses
+        run: |
+          pip install -r requirements.txt
+          pip install pip-licenses
+
+      - name: Check licenses
+        run: |
+          pip-licenses --format=json --output-file=licenses.json
+          pip-licenses --format=markdown --output-file=licenses.md
+          
+          # Check for copyleft licenses
+          pip-licenses --fail-on="GPL;AGPL;LGPL" || echo "⚠️ Copyleft licenses detected"
+        continue-on-error: true
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: |
+            licenses.json
+            licenses.md
+
+      - name: Run Trivy license scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'license'
+          format: 'table'
+          severity: 'UNKNOWN,HIGH,CRITICAL'
+        continue-on-error: true
+
+  # ============================================================
+  # SBOM Generation
+  # ============================================================
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t genovaai:sbom .
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: genovaai:sbom
+          format: spdx-json
+          output-file: sbom-spdx.json
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: genovaai:sbom
+          format: cyclonedx-json
+          output-file: sbom-cyclonedx.json
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: |
+            sbom-spdx.json
+            sbom-cyclonedx.json
+
+      - name: Upload SBOM to Dependency Graph
+        uses: anchore/sbom-action/publish-sbom@v0
+        with:
+          sbom-artifact-match: ".*\\.json"
+        continue-on-error: true
+
+  # ============================================================
+  # Security Summary
+  # ============================================================
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [sast-scan, codeql, dependency-scan, container-scan, iac-scan, secret-scan, license-scan, sbom]
+    if: always()
+    
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST (Bandit/Semgrep) | ${{ needs.sast-scan.result == 'success' && '✅' || '⚠️' }} ${{ needs.sast-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL | ${{ needs.codeql.result == 'success' && '✅' || '⚠️' }} ${{ needs.codeql.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Scan | ${{ needs.dependency-scan.result == 'success' && '✅' || '⚠️' }} ${{ needs.dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Scan | ${{ needs.container-scan.result == 'success' && '✅' || '⚠️' }} ${{ needs.container-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| IaC Scan | ${{ needs.iac-scan.result == 'success' && '✅' || '⚠️' }} ${{ needs.iac-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Detection | ${{ needs.secret-scan.result == 'success' && '✅' || '⚠️' }} ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Compliance | ${{ needs.license-scan.result == 'success' && '✅' || '⚠️' }} ${{ needs.license-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SBOM Generation | ${{ needs.sbom.result == 'success' && '✅' || '⚠️' }} ${{ needs.sbom.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📋 View detailed results in the Security tab" >> $GITHUB_STEP_SUMMARY

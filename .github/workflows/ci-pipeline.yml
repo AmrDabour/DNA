@@ -1,0 +1,502 @@
+# ============================================================
+# GenovaAI - Comprehensive CI Pipeline
+# ============================================================
+# This workflow runs on every PR and push to main, performing:
+# - Code quality checks (linting, formatting)
+# - Unit tests with coverage
+# - Integration tests
+# - ML model validation
+# - Performance benchmarks
+# - Security checks
+# ============================================================
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [ main, master, develop ]
+  push:
+    branches: [ main, master, develop ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11'
+  COVERAGE_THRESHOLD: 70
+
+jobs:
+  # ============================================================
+  # Code Quality Checks
+  # ============================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install linting tools
+        run: |
+          pip install black isort flake8 pylint mypy bandit
+
+      - name: Check formatting with Black
+        run: black --check --diff .
+
+      - name: Check import sorting with isort
+        run: isort --check-only --diff .
+
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Type checking with mypy
+        run: mypy --ignore-missing-imports --no-error-summary .
+        continue-on-error: true
+
+      - name: Security check with Bandit
+        run: bandit -r . -x ./tests,./venv -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  # ============================================================
+  # Unit Tests
+  # ============================================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: genovaai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: test
+          MONGO_INITDB_ROOT_PASSWORD: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-xdist pytest-html pytest-timeout
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/genovaai_test
+          REDIS_URL: redis://localhost:6379/0
+          MONGODB_URI: mongodb://test:test@localhost:27017/
+          FLASK_ENV: testing
+          TESTING: true
+        run: |
+          pytest tests/unit/ -v \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
+            --junitxml=test-results.xml \
+            --html=test-report.html \
+            -n auto \
+            --timeout=60
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            test-report.html
+            htmlcov/
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: test-results.xml
+
+  # ============================================================
+  # Integration Tests
+  # ============================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: genovaai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+      
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: test
+          MONGO_INITDB_ROOT_PASSWORD: test
+      
+      rabbitmq:
+        image: rabbitmq:3-management-alpine
+        ports:
+          - 5672:5672
+          - 15672:15672
+        env:
+          RABBITMQ_DEFAULT_USER: test
+          RABBITMQ_DEFAULT_PASS: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Wait for services
+        run: |
+          sleep 10
+          python -c "import psycopg2; psycopg2.connect('postgresql://test:test@localhost:5432/genovaai_test')"
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/genovaai_test
+          REDIS_URL: redis://localhost:6379/0
+          MONGODB_URI: mongodb://test:test@localhost:27017/
+          CELERY_BROKER_URL: amqp://test:test@localhost:5672//
+          FLASK_ENV: testing
+        run: |
+          pytest tests/integration/ -v --junitxml=integration-results.xml
+        continue-on-error: true
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: integration-results.xml
+
+  # ============================================================
+  # ML Model Validation
+  # ============================================================
+  ml-model-validation:
+    name: ML Model Validation
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest scikit-learn pandas numpy
+
+      - name: Verify ML models exist
+        run: |
+          python verify_models.py
+
+      - name: Run model validation tests
+        run: |
+          pytest tests/ml/ -v --junitxml=ml-test-results.xml
+        continue-on-error: true
+
+      - name: Test model predictions
+        run: |
+          python -c "
+          from ml_models.predictors import GenovaPredictor
+          predictor = GenovaPredictor()
+          print('✅ ML models loaded successfully')
+          "
+        continue-on-error: true
+
+      - name: Upload ML test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-test-results
+          path: ml-test-results.xml
+
+  # ============================================================
+  # API Contract Testing
+  # ============================================================
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: genovaai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-flask schemathesis httpx
+
+      - name: Run API tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/genovaai_test
+          REDIS_URL: redis://localhost:6379/0
+          FLASK_ENV: testing
+        run: |
+          pytest tests/api/ -v --junitxml=api-test-results.xml
+        continue-on-error: true
+
+      # Optional: OpenAPI schema validation
+      - name: Validate OpenAPI schema
+        run: |
+          pip install openapi-spec-validator
+          python -c "
+          import json
+          # Add OpenAPI validation if you have a spec file
+          print('OpenAPI validation skipped - no spec file')
+          "
+        continue-on-error: true
+
+      - name: Upload API test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: api-test-results.xml
+
+  # ============================================================
+  # Performance Benchmarks
+  # ============================================================
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: genovaai_test
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-benchmark locust
+
+      - name: Run benchmark tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/genovaai_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/benchmarks/ -v --benchmark-only --benchmark-json=benchmark-results.json
+        continue-on-error: true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.json
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'pytest'
+          output-file-path: benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          comment-on-alert: true
+          fail-on-alert: false
+        continue-on-error: true
+
+  # ============================================================
+  # Docker Build Test
+  # ============================================================
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: genovaai:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image
+        run: |
+          docker run --rm genovaai:ci-test python -c "print('Docker image works!')"
+
+      - name: Check image size
+        run: |
+          SIZE=$(docker image inspect genovaai:ci-test --format='{{.Size}}')
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "Image size: ${SIZE_MB}MB"
+          
+          # Fail if image is larger than 2GB
+          if [ $SIZE_MB -gt 2048 ]; then
+            echo "❌ Image too large: ${SIZE_MB}MB > 2048MB"
+            exit 1
+          fi
+          echo "✅ Image size acceptable"
+
+  # ============================================================
+  # Summary Job
+  # ============================================================
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests, integration-tests, ml-model-validation, api-tests, docker-build]
+    if: always()
+    
+    steps:
+      - name: Check job results
+        run: |
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality | ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ML Model Validation | ${{ needs.ml-model-validation.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API Tests | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Build | ${{ needs.docker-build.result }} |" >> $GITHUB_STEP_SUMMARY

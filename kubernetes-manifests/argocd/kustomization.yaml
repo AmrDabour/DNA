@@ -1,0 +1,53 @@
+# ============================================================
+# ArgoCD Kustomization
+# ============================================================
+# This kustomization manages ArgoCD deployment separately from
+# the main GenovaAI application. Apply this independently when
+# you want to use GitOps with ArgoCD.
+# ============================================================
+# Deploy ArgoCD:
+#   kubectl apply -k argocd/
+# 
+# Or deploy files individually:
+#   kubectl apply -f argocd/argocd.yaml
+#   kubectl apply -f argocd/argocd-image-updater.yaml
+#   kubectl apply -f argocd/argocd-application.yaml
+# ============================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Namespace for ArgoCD components
+namespace: argocd
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: argocd
+
+# Common annotations
+commonAnnotations:
+  argocd.argoproj.io/tracking-id: genovaai-argocd
+
+# Resources in dependency order
+resources:
+  # 1. Core ArgoCD installation (includes namespace)
+  - argocd.yaml
+  
+  # 2. Image Updater for automatic image updates
+  - argocd-image-updater.yaml
+  
+  # 3. GenovaAI Application definition
+  # NOTE: Apply this AFTER ArgoCD is fully running
+  # You may want to apply this separately:
+  #   kubectl apply -f argocd/argocd-application.yaml
+  - argocd-application.yaml
+
+# Images - override default images if needed
+# images:
+#   - name: quay.io/argoproj/argocd
+#     newTag: v2.9.3
+#   - name: quay.io/argoproj/argocd-image-updater
+#     newTag: v0.15.1
+#   - name: redis
+#     newTag: 7.0.14-alpine

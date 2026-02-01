@@ -1,0 +1,144 @@
+# ============================================================
+# ArgoCD Application - GenovaAI DNA Analysis Platform
+# ============================================================
+# This file defines the ArgoCD Application CRD that connects
+# ArgoCD to the GenovaAI Kubernetes manifests for GitOps-based
+# continuous deployment.
+# ============================================================
+# Deploy: kubectl apply -f argocd/argocd-application.yaml
+# ============================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: genovaai
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: genovaai
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    # ========================================================
+    # ArgoCD Image Updater Configuration
+    # ========================================================
+    # Enable automatic image updates for GenovaAI containers
+    argocd-image-updater.argoproj.io/image-list: |
+      genovaai=amrdabour/genovaai:latest
+    
+    # Update strategy options: latest, semver, digest, name
+    argocd-image-updater.argoproj.io/genovaai.update-strategy: latest
+    
+    # Write back method: argocd (updates Application) or git (commits to repo)
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+    
+    # Optional: Allow specific tag patterns (uncomment for semver)
+    # argocd-image-updater.argoproj.io/genovaai.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    
+    # Optional: Pull secret for private registries
+    # argocd-image-updater.argoproj.io/pull-secret: pullsecret:argocd/dockerhub-secret
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project this application belongs to
+  project: default
+  
+  # ========================================================
+  # Source - Git Repository Configuration
+  # ========================================================
+  source:
+    # GitHub repository URL
+    repoURL: https://github.com/AmrDabour/DNA.git
+    
+    # Branch to track
+    targetRevision: main
+    
+    # Path to Kubernetes manifests (relative to repo root)
+    path: kubernetes-manifests
+    
+    # Optional: Kustomize configuration
+    # ArgoCD automatically detects kustomization.yaml
+    # kustomize:
+    #   namePrefix: prod-
+    #   nameSuffix: -v1
+    
+  # ========================================================
+  # Destination - Target Kubernetes Cluster & Namespace
+  # ========================================================
+  destination:
+    # Kubernetes API server (in-cluster)
+    server: https://kubernetes.default.svc
+    
+    # Target namespace for GenovaAI resources
+    namespace: genovaai
+  
+  # ========================================================
+  # Sync Policy - Automated GitOps Configuration
+  # ========================================================
+  syncPolicy:
+    # Automated sync enabled
+    automated:
+      # Prune resources that no longer exist in Git
+      prune: true
+      
+      # Self-heal - revert manual changes in cluster
+      selfHeal: true
+      
+      # Don't sync if source is empty
+      allowEmpty: false
+    
+    # Sync options
+    syncOptions:
+      # Create namespace if it doesn't exist
+      - CreateNamespace=true
+      
+      # Validate resources before applying
+      - Validate=true
+      
+      # Prune last to avoid conflicts
+      - PruneLast=true
+      
+      # Use foreground deletion for proper cleanup
+      - PrunePropagationPolicy=foreground
+      
+      # Replace resources instead of applying (for immutable fields)
+      # - Replace=true
+    
+    # Retry configuration for failed syncs
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# ============================================================
+# ArgoCD Application - GenovaAI (Development/Staging)
+# ============================================================
+# Uncomment this for a separate dev/staging environment
+# ============================================================
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: genovaai-dev
+#   namespace: argocd
+#   labels:
+#     app.kubernetes.io/name: genovaai-dev
+#     app.kubernetes.io/part-of: argocd
+#     environment: development
+#   finalizers:
+#     - resources-finalizer.argocd.argoproj.io
+# spec:
+#   project: default
+#   source:
+#     repoURL: https://github.com/AmrDabour/DNA.git
+#     targetRevision: develop  # Track develop branch
+#     path: kubernetes-manifests
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: genovaai-dev
+#   syncPolicy:
+#     automated:
+#       prune: true
+#       selfHeal: true
+#     syncOptions:
+#       - CreateNamespace=true
