@@ -453,23 +453,50 @@ def process_snp_file():
       200:
         description: Processing result
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("=== process_snp_file API called ===")
+    
     try:
+        # Log request details
+        logger.info(f"Request method: {request.method}")
+        logger.info(f"Request content-type: {request.content_type}")
+        logger.info(f"Request data: {request.data[:500] if request.data else 'empty'}")
+        
         data = request.json
+        logger.info(f"Parsed JSON data: {data}")
+        
+        if data is None:
+            logger.error("request.json returned None - invalid JSON in request body")
+            return jsonify({"success": False, "error": "Invalid JSON in request body"})
+        
         file_path = data.get("file_path")
+        logger.info(f"File path from request: {file_path}")
 
-        if not file_path or not os.path.exists(file_path):
-            return jsonify({"success": False, "error": "File not found"})
+        if not file_path:
+            logger.error("No file_path provided in request")
+            return jsonify({"success": False, "error": "No file path provided"})
+            
+        if not os.path.exists(file_path):
+            logger.error(f"File not found: {file_path}")
+            return jsonify({"success": False, "error": f"File not found: {file_path}"})
 
         patient_id = os.path.splitext(os.path.basename(file_path))[0]
+        logger.info(f"Patient ID: {patient_id}")
         start_time = time.time()
 
         # Use model packages from ml_models directory (contains metadata.json and encoding_function.py)
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         sex_package_dir = os.path.join(project_root, "ml_models", "gender_prediction_package")
         region_package_dir = os.path.join(project_root, "ml_models", "region_prediction_package")
+        logger.info(f"Project root: {project_root}")
+        logger.info(f"Sex package dir: {sex_package_dir}, exists: {os.path.exists(sex_package_dir)}")
+        logger.info(f"Region package dir: {region_package_dir}, exists: {os.path.exists(region_package_dir)}")
 
         script_path = os.path.join(project_root, "ml_models", "predict_patient.py")
+        logger.info(f"Script path: {script_path}, exists: {os.path.exists(script_path)}")
         if not os.path.exists(script_path):
+            logger.error(f"predict_patient.py script not found at {script_path}")
             return jsonify({"success": False, "error": "predict_patient.py script not found"})
 
         abs_file_path = os.path.abspath(file_path)
@@ -484,21 +511,27 @@ def process_snp_file():
             "--sample", abs_file_path,
             "--prediction-type", "both",
         ]
+        logger.info(f"Command to run: {' '.join(cmd)}")
 
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
 
         try:
+            logger.info("Starting subprocess...")
             process_result = subprocess.run(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 env=env, text=True, encoding='utf-8', errors='replace', check=False, timeout=300,
             )
             stdout = process_result.stdout if hasattr(process_result, "stdout") else ""
             stderr = process_result.stderr if hasattr(process_result, "stderr") else ""
+            logger.info(f"Subprocess completed with return code: {process_result.returncode}")
+            logger.info(f"STDOUT (first 1000 chars): {stdout[:1000] if stdout else 'empty'}")
+            logger.info(f"STDERR (first 1000 chars): {stderr[:1000] if stderr else 'empty'}")
             
             # Check for critical errors in the output
             if "ERROR: Missing required columns" in stdout or "ERROR: Missing required columns" in stderr:
                 error_msg = "Invalid file format. The CSV file must contain columns: SNP, Allele1, Allele2. Optional columns: Patient_ID, Population, gender/Sex"
+                logger.error(f"Missing required columns error: {error_msg}")
                 if current_user.is_authenticated:
                     notify_user(
                         user_id=current_user.id,
@@ -511,6 +544,7 @@ def process_snp_file():
             # Check for non-zero exit code
             if process_result.returncode != 0 and not stdout:
                 error_msg = f"Processing failed: {stderr[:500] if stderr else 'Unknown error'}"
+                logger.error(f"Process failed with non-zero exit code: {error_msg}")
                 return jsonify({"success": False, "error": error_msg, "stderr": stderr})
                 
         except subprocess.TimeoutExpired:
@@ -527,20 +561,31 @@ def process_snp_file():
 
         upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
         result_folder = os.path.join(os.getcwd(), "result")
+        logger.info(f"Upload folder: {upload_folder}")
+        logger.info(f"Result folder: {result_folder}")
         
         # Check result folder first (primary location)
         result_file = os.path.join(result_folder, f"{patient_id}_combined_prediction_results.json")
         alt_result_file = os.path.join(os.path.dirname(file_path), f"{patient_id}_combined_prediction_results.json")
         upload_result_file = os.path.join(upload_folder, f"{patient_id}_combined_prediction_results.json")
         root_result_file = f"{patient_id}_combined_prediction_results.json"
+        
+        logger.info(f"Looking for result files:")
+        logger.info(f"  - result_file: {result_file}, exists: {os.path.exists(result_file)}")
+        logger.info(f"  - alt_result_file: {alt_result_file}, exists: {os.path.exists(alt_result_file)}")
+        logger.info(f"  - upload_result_file: {upload_result_file}, exists: {os.path.exists(upload_result_file)}")
+        logger.info(f"  - root_result_file: {root_result_file}, exists: {os.path.exists(root_result_file)}")
 
         found_result_file = None
         for possible_file in [result_file, alt_result_file, upload_result_file, root_result_file]:
             if os.path.exists(possible_file):
                 found_result_file = possible_file
                 break
+        
+        logger.info(f"Found result file: {found_result_file}")
 
         if not found_result_file:
+            logger.info("No result file found, extracting from stdout...")
             extracted_results = {
                 "patient_id": patient_id,
                 "file_name": os.path.basename(file_path),
@@ -553,58 +598,74 @@ def process_snp_file():
             sex_match = re.search(r"Predicted Gender: ([A-Za-z]+)", stdout) if stdout else None
             if sex_match:
                 extracted_results["gender_prediction"]["predicted_sex"] = sex_match.group(1)
+                logger.info(f"Extracted gender: {sex_match.group(1)}")
 
             region_match = re.search(r"Predicted Population: ([A-Z]+)", stdout) if stdout else None
             if region_match:
                 extracted_results["region_prediction"]["prediction"]["predicted_population"] = region_match.group(1)
+                logger.info(f"Extracted region: {region_match.group(1)}")
 
             # Save to result folder with user-specific naming for logged-in users
             os.makedirs(result_folder, exist_ok=True)
             user_id = current_user.id if current_user.is_authenticated else None
+            logger.info(f"User ID: {user_id}, authenticated: {current_user.is_authenticated}")
             if user_id:
                 result_filename = f"{patient_id}_user{user_id}_combined_prediction_results.json"
             else:
                 result_filename = f"{patient_id}_combined_prediction_results.json"
             final_result_file = os.path.join(result_folder, result_filename)
+            logger.info(f"Saving extracted results to: {final_result_file}")
             
             # Save extracted results to JSON file
             with open(final_result_file, 'w') as f:
                 json.dump(extracted_results, f, indent=2)
+            logger.info("Extracted results saved to JSON file")
             
             # Save to database with user association
             processing_time = time.time() - start_time
             try:
                 save_analysis_to_database(patient_id, file_path, extracted_results, processing_time, user_id)
+                logger.info("Analysis saved to database")
             except Exception as db_error:
-                print(f"Warning: Could not save to database: {db_error}")
+                logger.error(f"Warning: Could not save to database: {db_error}")
             
             # Send notification to user if authenticated
             if user_id:
                 gender = extracted_results.get("gender_prediction", {}).get("predicted_sex", "Unknown")
                 ancestry = extracted_results.get("region_prediction", {}).get("prediction", {}).get("predicted_population", "Unknown")
-                notify_user(
-                    user_id=user_id,
-                    title="🧬 Analysis Complete",
-                    message=f"Sample {patient_id}: {gender}, {ancestry} ancestry. Processing took {processing_time:.1f}s",
-                    notification_type="success",
-                    data={"patient_id": patient_id, "result_file": final_result_file}
-                )
+                try:
+                    notify_user(
+                        user_id=user_id,
+                        title="🧬 Analysis Complete",
+                        message=f"Sample {patient_id}: {gender}, {ancestry} ancestry. Processing took {processing_time:.1f}s",
+                        notification_type="success",
+                        data={"patient_id": patient_id, "result_file": final_result_file}
+                    )
+                    logger.info("User notification sent")
+                except Exception as notify_error:
+                    logger.error(f"Notification error: {notify_error}")
             
-            return jsonify({
+            logger.info("Returning JSON response (extracted data path)")
+            response_data = {
                 "success": True,
                 "patient_id": patient_id,
                 "result_file": final_result_file,
                 "processing_time": processing_time,
                 "used_extracted_data": True,
-            })
+            }
+            logger.info(f"Response data: {response_data}")
+            return jsonify(response_data)
 
         try:
+            logger.info(f"Reading result file: {found_result_file}")
             with open(found_result_file, "r") as f:
                 result_data = json.load(f)  # Validate JSON is readable and load data
+            logger.info("Result file loaded successfully")
 
             # Copy to result folder with user-specific naming for logged-in users
             os.makedirs(result_folder, exist_ok=True)
             user_id = current_user.id if current_user.is_authenticated else None
+            logger.info(f"User ID: {user_id}, authenticated: {current_user.is_authenticated}")
             if user_id:
                 result_filename = f"{patient_id}_user{user_id}_combined_prediction_results.json"
             else:
@@ -612,13 +673,15 @@ def process_snp_file():
             final_result_file = os.path.join(result_folder, result_filename)
             if found_result_file != final_result_file:
                 shutil.copy2(found_result_file, final_result_file)
+                logger.info(f"Copied result to: {final_result_file}")
 
             # Save to database with user association
             processing_time = time.time() - start_time
             try:
                 save_analysis_to_database(patient_id, file_path, result_data, processing_time, user_id)
+                logger.info("Analysis saved to database")
             except Exception as db_error:
-                print(f"Warning: Could not save to database: {db_error}")
+                logger.error(f"Warning: Could not save to database: {db_error}")
 
             # Send notification to user if authenticated
             if user_id:
@@ -628,29 +691,42 @@ def process_snp_file():
                 ancestry = result_data.get("region_prediction", {}).get("prediction", {})
                 if isinstance(ancestry, dict):
                     ancestry = ancestry.get("predicted_population", "Unknown")
-                notify_user(
-                    user_id=user_id,
-                    title="🧬 Analysis Complete",
-                    message=f"Sample {patient_id}: {gender}, {ancestry} ancestry. Processing took {processing_time:.1f}s",
-                    notification_type="success",
-                    data={"patient_id": patient_id, "result_file": final_result_file}
-                )
+                try:
+                    notify_user(
+                        user_id=user_id,
+                        title="🧬 Analysis Complete",
+                        message=f"Sample {patient_id}: {gender}, {ancestry} ancestry. Processing took {processing_time:.1f}s",
+                        notification_type="success",
+                        data={"patient_id": patient_id, "result_file": final_result_file}
+                    )
+                    logger.info("User notification sent")
+                except Exception as notify_error:
+                    logger.error(f"Notification error: {notify_error}")
 
-            return jsonify({
+            logger.info("Returning JSON response (result file path)")
+            response_data = {
                 "success": True,
                 "patient_id": patient_id,
                 "result_file": final_result_file,
                 "processing_time": processing_time,
                 "used_extracted_data": False,
-            })
+            }
+            logger.info(f"Response data: {response_data}")
+            return jsonify(response_data)
 
         except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
             return jsonify({"success": False, "error": f"Invalid JSON in results file: {str(e)}"})
         except Exception as e:
+            logger.error(f"Error processing results: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return jsonify({"success": False, "error": f"Error processing results: {str(e)}"})
 
     except Exception as e:
         import traceback
+        logger.error(f"Unhandled exception in process_snp_file: {e}")
+        logger.error(traceback.format_exc())
         # Send error notification if user is authenticated
         if current_user.is_authenticated:
             notify_user(

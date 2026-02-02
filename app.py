@@ -2,17 +2,30 @@
 DNA Genetic Prediction Web Application
 Main Flask application file - handles app setup and core page routes
 """
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from flask_login import LoginManager, current_user
 import os
+import logging
 import pandas as pd
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log', mode='a', encoding='utf-8')
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Try to import flasgger (optional)
 try:
     from flasgger import Swagger
     SWAGGER_AVAILABLE = True
-except ImportError:
+except (ImportError, Exception) as e:
+    logger.warning(f"Flasgger not available: {e}")
     SWAGGER_AVAILABLE = False
 
 # Load environment variables from .env file if it exists
@@ -415,7 +428,32 @@ def detailed_health_check():
 
 @app.errorhandler(404)
 def page_not_found(e):
+    # Return JSON for API requests, HTML for browser requests
+    if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
+        return jsonify({"success": False, "error": "Resource not found", "path": request.path}), 404
     return render_template("404.html"), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    import traceback
+    error_trace = traceback.format_exc()
+    app.logger.error(f"500 Error: {str(e)}\n{error_trace}")
+    # Return JSON for API requests, HTML for browser requests
+    if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
+        return jsonify({"success": False, "error": f"Internal server error: {str(e)}", "traceback": error_trace}), 500
+    return render_template("404.html", error="Internal Server Error"), 500
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    error_trace = traceback.format_exc()
+    app.logger.error(f"Unhandled Exception: {str(e)}\n{error_trace}")
+    # Return JSON for API requests
+    if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
+        return jsonify({"success": False, "error": f"Unexpected error: {str(e)}", "traceback": error_trace}), 500
+    return render_template("404.html", error=str(e)), 500
 
 
 # ============================================================
