@@ -66,10 +66,33 @@ def predict_patient_gender(package_dir, patient_file):
         print(f"\nReading patient SNP data from: {patient_file}")
         patient_data = pd.read_csv(patient_file)
         
-        # Extract patient metadata
+        # Validate required columns exist
+        required_columns = ['SNP', 'Allele1', 'Allele2']
+        missing_columns = [col for col in required_columns if col not in patient_data.columns]
+        if missing_columns:
+            print(f"ERROR: Missing required columns: {missing_columns}")
+            print(f"Available columns: {patient_data.columns.tolist()}")
+            print(f"Required columns: SNP, Allele1, Allele2 (and optionally: Patient_ID, Population, gender/Sex)")
+            return None
+        
+        # Extract patient metadata (optional columns - use defaults if not present)
         patient_id = patient_data['Patient_ID'].iloc[0] if 'Patient_ID' in patient_data.columns else os.path.basename(patient_file).split('.')[0]
         population = patient_data['Population'].iloc[0] if 'Population' in patient_data.columns else "Unknown"
-        true_sex = patient_data['gender'].iloc[0] if 'gender' in patient_data.columns else 0
+        
+        # Handle different gender/sex column names
+        true_sex = 0
+        if 'gender' in patient_data.columns:
+            true_sex = patient_data['gender'].iloc[0]
+        elif 'Sex' in patient_data.columns:
+            true_sex = patient_data['Sex'].iloc[0]
+        elif 'sex' in patient_data.columns:
+            true_sex = patient_data['sex'].iloc[0]
+        
+        # Convert sex value to int if it's a valid value
+        try:
+            true_sex = int(true_sex) if pd.notna(true_sex) else 0
+        except (ValueError, TypeError):
+            true_sex = 0
         
         sex_label = "Male" if true_sex == 1 else "Female" if true_sex == 2 else "Unknown"
         print(f"Patient info - ID: {patient_id}, True Gender: {sex_label} ({true_sex}), Population: {population}")
@@ -79,10 +102,14 @@ def predict_patient_gender(package_dir, patient_file):
         matched_snps = 0
         genotype_data = []
         
-        # Create a lookup for the patient data
-        patient_snp_lookup = {row['SNP']: (row['Allele1'], row['Allele2']) 
-                           for _, row in patient_data.iterrows() 
-                           if 'SNP' in row and 'Allele1' in row and 'Allele2' in row}
+        # Create a lookup for the patient data (only if required columns exist)
+        patient_snp_lookup = {}
+        for _, row in patient_data.iterrows():
+            snp_val = row.get('SNP')
+            allele1_val = row.get('Allele1')
+            allele2_val = row.get('Allele2')
+            if pd.notna(snp_val) and pd.notna(allele1_val) and pd.notna(allele2_val):
+                patient_snp_lookup[snp_val] = (allele1_val, allele2_val)
         
         # Extract only the selected SNPs in the right order
         for _, row in components['selected_snps'].iterrows():
@@ -261,10 +288,27 @@ def predict_patient_region(
         print(f"\nReading patient data file: {patient_file}")
         sample_data = pd.read_csv(patient_file)
         
-        # Extract metadata
+        # Validate required columns exist
+        required_columns = ['SNP', 'Allele1', 'Allele2']
+        missing_columns = [col for col in required_columns if col not in sample_data.columns]
+        if missing_columns:
+            print(f"ERROR: Missing required columns: {missing_columns}")
+            print(f"Available columns: {sample_data.columns.tolist()}")
+            print(f"Required columns: SNP, Allele1, Allele2 (and optionally: Patient_ID, Population, gender/Sex)")
+            return None
+        
+        # Extract metadata (optional columns - use defaults if not present)
         true_population = sample_data['Population'].iloc[0] if 'Population' in sample_data.columns else "Unknown"
         patient_id = sample_data['Patient_ID'].iloc[0] if 'Patient_ID' in sample_data.columns else os.path.basename(patient_file).split('.')[0]
-        gender = sample_data['gender'].iloc[0] if 'gender' in sample_data.columns else None
+        
+        # Handle different gender/sex column names
+        gender = None
+        if 'gender' in sample_data.columns:
+            gender = sample_data['gender'].iloc[0]
+        elif 'Sex' in sample_data.columns:
+            gender = sample_data['Sex'].iloc[0]
+        elif 'sex' in sample_data.columns:
+            gender = sample_data['sex'].iloc[0]
         
         print(f"Patient info - ID: {patient_id}, True Population: {true_population}")
         print(f"Sample contains {len(sample_data)} SNPs")
@@ -273,10 +317,14 @@ def predict_patient_region(
         matched_snps = 0
         genotype_data = []
         
-        # Create a fast lookup dictionary
-        sample_snp_lookup = {row['SNP']: (row['Allele1'], row['Allele2']) 
-                           for _, row in sample_data.iterrows() 
-                           if 'SNP' in row and 'Allele1' in row and 'Allele2' in row}
+        # Create a fast lookup dictionary (only if required columns exist)
+        sample_snp_lookup = {}
+        for _, row in sample_data.iterrows():
+            snp_val = row.get('SNP')
+            allele1_val = row.get('Allele1')
+            allele2_val = row.get('Allele2')
+            if pd.notna(snp_val) and pd.notna(allele1_val) and pd.notna(allele2_val):
+                sample_snp_lookup[snp_val] = (allele1_val, allele2_val)
         
         # Extract only SNPs from the reference panel
         for _, row in components['selected_snps'].iterrows():

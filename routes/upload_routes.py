@@ -494,7 +494,25 @@ def process_snp_file():
                 env=env, text=True, encoding='utf-8', errors='replace', check=False, timeout=300,
             )
             stdout = process_result.stdout if hasattr(process_result, "stdout") else ""
-            # stderr available but not used currently
+            stderr = process_result.stderr if hasattr(process_result, "stderr") else ""
+            
+            # Check for critical errors in the output
+            if "ERROR: Missing required columns" in stdout or "ERROR: Missing required columns" in stderr:
+                error_msg = "Invalid file format. The CSV file must contain columns: SNP, Allele1, Allele2. Optional columns: Patient_ID, Population, gender/Sex"
+                if current_user.is_authenticated:
+                    notify_user(
+                        user_id=current_user.id,
+                        title="❌ Invalid File Format",
+                        message=error_msg,
+                        notification_type="error"
+                    )
+                return jsonify({"success": False, "error": error_msg})
+            
+            # Check for non-zero exit code
+            if process_result.returncode != 0 and not stdout:
+                error_msg = f"Processing failed: {stderr[:500] if stderr else 'Unknown error'}"
+                return jsonify({"success": False, "error": error_msg, "stderr": stderr})
+                
         except subprocess.TimeoutExpired:
             if current_user.is_authenticated:
                 notify_user(
