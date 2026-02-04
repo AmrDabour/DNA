@@ -231,8 +231,56 @@ def predict_physical_from_sample():
         elif 'population' in df.columns:
             population = str(df['population'].iloc[0])
         
+        # If gender or population is unknown, try to run ML prediction
         if gender == "Unknown" or population == "Unknown":
-            return jsonify({"success": False, "error": f"Could not determine gender ({gender}) or population ({population})"})
+            try:
+                # Call the ML prediction endpoint
+                import subprocess
+                import sys
+                import json
+                
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                script_path = os.path.join(project_root, "ml_models", "predict_patient.py")
+                sex_package_dir = os.path.join(project_root, "ml_models", "gender_prediction_package")
+                region_package_dir = os.path.join(project_root, "ml_models", "region_prediction_package")
+                
+                if os.path.exists(script_path):
+                    cmd = [
+                        sys.executable, script_path,
+                        "--gender-package-dir", sex_package_dir,
+                        "--region-package-dir", region_package_dir,
+                        "--sample", os.path.abspath(sample_file),
+                        "--prediction-type", "both",
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                    
+                    # Try to find the result file
+                    result_folder = os.path.join(project_root, "result")
+                    base_name = os.path.splitext(os.path.basename(sample_file))[0]
+                    
+                    for f in os.listdir(result_folder) if os.path.exists(result_folder) else []:
+                        if f.startswith(base_name) and f.endswith('_combined_prediction_results.json'):
+                            result_file = os.path.join(result_folder, f)
+                            with open(result_file, 'r') as rf:
+                                ml_result = json.load(rf)
+                            
+                            # Extract predictions
+                            sex_pred = ml_result.get("sex_prediction", ml_result.get("gender_prediction", {}))
+                            region_pred = ml_result.get("region_prediction", {})
+                            
+                            if sex_pred:
+                                gender = sex_pred.get("predicted_sex", "Unknown")
+                            if region_pred:
+                                pred_obj = region_pred.get("prediction", {})
+                                if isinstance(pred_obj, dict):
+                                    population = pred_obj.get("predicted_population", "Unknown")
+                            break
+            except Exception as ml_err:
+                print(f"ML prediction failed: {ml_err}")
+        
+        if gender == "Unknown" or population == "Unknown":
+            return jsonify({"success": False, "error": f"Could not determine gender ({gender}) or population ({population}). Try running full analysis first."})
         
         # Call the main prediction endpoint logic
         api_key, model_name = get_api_config()
@@ -323,11 +371,70 @@ def generate_person_image():
     try:
         pop_description = POPULATION_INFO.get(population.upper(), {}).get("description", population)
         
-        # Determine gender description
-        gender = "man" if gender.lower() == "male" else "woman" if gender.lower() == "female" else "person"
+        # First, get detailed physical characteristics using AI
+        genai.configure(api_key=api_key)
+        model_name = os.environ.get("AGENT_MODEL") or os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-exp")
+        traits_model = genai.GenerativeModel(model_name=model_name)
         
-        # Build detailed prompt based on ancestry and gender
-        prompt = f"""Generate a realistic portrait photograph of an adult {gender} with typical {pop_description} ancestry features.
+        traits_prompt = f"""Analyze physical traits for: {gender}, {population} ({pop_description}).
+Return ONLY a JSON object with these exact fields (no markdown, no extra text):
+{{
+  "hair_color": "specific color",
+  "hair_texture": "specific texture",
+  "eye_color": "specific color",
+  "eye_shape": "specific shape",
+  "skin_tone": "specific tone with undertones",
+  "face_shape": "specific shape",
+  "nose": "specific characteristics",
+  "lips": "specific characteristics",
+  "build": "specific build type",
+  "distinctive_features": "any other notable features"
+}}
+
+Be specific and scientifically accurate for {pop_description} ancestry."""
+
+        traits_response = traits_model.generate_content(traits_prompt)
+        traits_text = traits_response.text.strip()
+        
+        # Extract JSON from response (handle markdown code blocks)
+        if "```json" in traits_text:
+            traits_text = traits_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in traits_text:
+            traits_text = traits_text.split("```")[1].split("```")[0].strip()
+        
+        try:
+            physical_traits = json.loads(traits_text)
+        except:
+            # Fallback to basic prompt if JSON parsing fails
+            physical_traits = None
+        
+        # Determine gender description
+        gender_word = "man" if gender.lower() == "male" else "woman" if gender.lower() == "female" else "person"
+        
+        # Build detailed prompt based on physical traits
+        if physical_traits:
+            prompt = f"""Generate a realistic portrait photograph of an adult {gender_word} with {pop_description} ancestry.
+
+SPECIFIC PHYSICAL CHARACTERISTICS TO INCLUDE:
+- Hair: {physical_traits.get('hair_color', 'black')} color, {physical_traits.get('hair_texture', 'straight')} texture
+- Eyes: {physical_traits.get('eye_color', 'dark brown')} colored, {physical_traits.get('eye_shape', 'almond-shaped')} eyes
+- Skin: {physical_traits.get('skin_tone', 'medium')} skin tone
+- Face: {physical_traits.get('face_shape', 'oval')} face shape
+- Nose: {physical_traits.get('nose', 'medium bridge')}
+- Lips: {physical_traits.get('lips', 'medium fullness')}
+- Build: {physical_traits.get('build', 'average')} build
+- Additional features: {physical_traits.get('distinctive_features', 'natural appearance')}
+
+Style requirements:
+- Age: adult (25-40 years old)
+- Expression: neutral, natural, friendly
+- Lighting: soft, professional studio lighting
+- Background: simple, light colored background
+- Style: professional headshot portrait photograph
+- High quality, photorealistic image"""
+        else:
+            # Fallback to basic prompt
+            prompt = f"""Generate a realistic portrait photograph of an adult {gender_word} with typical {pop_description} ancestry features.
 
 Physical characteristics to include:
 - Natural skin tone typical of {pop_description} population
@@ -555,23 +662,100 @@ def full_genetic_report():
         patient_id = df['Patient_ID'].iloc[0] if 'Patient_ID' in df.columns else "Unknown"
         total_snps = len(df)
         
-        # Check for gender/sex column (different CSV formats use different names)
+        # First, try to get gender/population from ML prediction results
         gender = "Unknown"
-        sex_code = None
-        if 'gender' in df.columns:
-            sex_code = df['gender'].iloc[0]
-        elif 'Sex' in df.columns:
-            sex_code = df['Sex'].iloc[0]
-        elif 'sex' in df.columns:
-            sex_code = df['sex'].iloc[0]
-        if sex_code is not None:
-            gender = "Male" if sex_code == 1 else "Female" if sex_code == 2 else "Unknown"
-        
         population = "Unknown"
-        if 'Population' in df.columns:
-            population = str(df['Population'].iloc[0])
-        elif 'population' in df.columns:
-            population = str(df['population'].iloc[0])
+        
+        # Look for ML prediction result file
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        result_folder = os.path.join(project_root, "result")
+        base_name = os.path.splitext(os.path.basename(sample_file))[0]
+        
+        # Search for existing prediction result
+        ml_result = None
+        if os.path.exists(result_folder):
+            for f in os.listdir(result_folder):
+                if base_name in f and f.endswith('_combined_prediction_results.json'):
+                    try:
+                        with open(os.path.join(result_folder, f), 'r') as rf:
+                            ml_result = json.load(rf)
+                        break
+                    except:
+                        pass
+        
+        # Extract from ML results if available
+        if ml_result:
+            sex_pred = ml_result.get("sex_prediction", ml_result.get("gender_prediction", {}))
+            region_pred = ml_result.get("region_prediction", {})
+            
+            if sex_pred:
+                gender = sex_pred.get("predicted_sex", "Unknown")
+            if region_pred:
+                pred_obj = region_pred.get("prediction", {})
+                if isinstance(pred_obj, dict):
+                    population = pred_obj.get("predicted_population", "Unknown")
+        
+        # If not found in ML results, try CSV columns as fallback
+        if gender == "Unknown":
+            sex_code = None
+            if 'gender' in df.columns:
+                sex_code = df['gender'].iloc[0]
+            elif 'Sex' in df.columns:
+                sex_code = df['Sex'].iloc[0]
+            elif 'sex' in df.columns:
+                sex_code = df['sex'].iloc[0]
+            if sex_code is not None:
+                gender = "Male" if sex_code == 1 else "Female" if sex_code == 2 else "Unknown"
+        
+        if population == "Unknown":
+            if 'Population' in df.columns:
+                population = str(df['Population'].iloc[0])
+            elif 'population' in df.columns:
+                population = str(df['population'].iloc[0])
+        
+        # If still unknown, run ML prediction now
+        if gender == "Unknown" or population == "Unknown":
+            try:
+                import subprocess
+                import sys
+                
+                script_path = os.path.join(project_root, "ml_models", "predict_patient.py")
+                sex_package_dir = os.path.join(project_root, "ml_models", "gender_prediction_package")
+                region_package_dir = os.path.join(project_root, "ml_models", "region_prediction_package")
+                
+                if os.path.exists(script_path):
+                    cmd = [
+                        sys.executable, script_path,
+                        "--gender-package-dir", sex_package_dir,
+                        "--region-package-dir", region_package_dir,
+                        "--sample", os.path.abspath(sample_file),
+                        "--prediction-type", "both",
+                    ]
+                    
+                    subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+                    
+                    # Re-check for result file
+                    if os.path.exists(result_folder):
+                        for f in os.listdir(result_folder):
+                            if base_name in f and f.endswith('_combined_prediction_results.json'):
+                                try:
+                                    with open(os.path.join(result_folder, f), 'r') as rf:
+                                        ml_result = json.load(rf)
+                                    
+                                    sex_pred = ml_result.get("sex_prediction", ml_result.get("gender_prediction", {}))
+                                    region_pred = ml_result.get("region_prediction", {})
+                                    
+                                    if sex_pred and gender == "Unknown":
+                                        gender = sex_pred.get("predicted_sex", "Unknown")
+                                    if region_pred and population == "Unknown":
+                                        pred_obj = region_pred.get("prediction", {})
+                                        if isinstance(pred_obj, dict):
+                                            population = pred_obj.get("predicted_population", "Unknown")
+                                    break
+                                except:
+                                    pass
+            except Exception as ml_err:
+                print(f"ML prediction error: {ml_err}")
         
         pop_description = POPULATION_INFO.get(population.upper(), {}).get("description", population)
         
@@ -673,6 +857,7 @@ def generate_image_from_sample():
     """
     import base64
     from google import genai as genai_new
+    import glob
     
     data = request.json
     sample_file = data.get("sample_file")
@@ -685,24 +870,55 @@ def generate_image_from_sample():
         
         patient_id = df['Patient_ID'].iloc[0] if 'Patient_ID' in df.columns else "Unknown"
         
-        # Check for gender/sex column (different CSV formats use different names)
-        gender = "Unknown"
-        sex_code = None
-        if 'gender' in df.columns:
-            sex_code = df['gender'].iloc[0]
-        elif 'Sex' in df.columns:
-            sex_code = df['Sex'].iloc[0]
-        elif 'sex' in df.columns:
-            sex_code = df['sex'].iloc[0]
+        # First, try to get gender/population from parameters (if provided)
+        gender = data.get("gender", "Unknown")
+        population = data.get("population", "Unknown")
         
-        if sex_code is not None:
-            gender = "Male" if sex_code == 1 else "Female" if sex_code == 2 else "Unknown"
+        # If not provided, try reading from CSV columns
+        if gender == "Unknown":
+            sex_code = None
+            if 'gender' in df.columns:
+                sex_code = df['gender'].iloc[0]
+            elif 'Sex' in df.columns:
+                sex_code = df['Sex'].iloc[0]
+            elif 'sex' in df.columns:
+                sex_code = df['sex'].iloc[0]
+            
+            if sex_code is not None:
+                gender = "Male" if sex_code == 1 else "Female" if sex_code == 2 else "Unknown"
         
-        population = "Unknown"
-        if 'Population' in df.columns:
-            population = str(df['Population'].iloc[0])
-        elif 'population' in df.columns:
-            population = str(df['population'].iloc[0])
+        if population == "Unknown":
+            if 'Population' in df.columns:
+                population = str(df['Population'].iloc[0])
+            elif 'population' in df.columns:
+                population = str(df['population'].iloc[0])
+        
+        # If still unknown, try reading from result file
+        if gender == "Unknown" or population == "Unknown":
+            result_dir = "result"
+            # Find result files matching this sample
+            sample_basename = os.path.basename(sample_file).replace('.csv', '')
+            result_files = glob.glob(os.path.join(result_dir, f"{sample_basename}*_combined_prediction_results.json"))
+            
+            if result_files:
+                # Use the most recent result file
+                result_file = max(result_files, key=os.path.getmtime)
+                with open(result_file, 'r') as f:
+                    result_data = json.load(f)
+                    
+                    # Extract gender from various possible locations
+                    if gender == "Unknown":
+                        gender = (result_data.get('sex_prediction', {}).get('predicted_sex') or
+                                 result_data.get('gender_prediction', {}).get('predicted_gender') or
+                                 result_data.get('predicted_gender') or
+                                 result_data.get('gender', "Unknown"))
+                    
+                    # Extract population from various possible locations
+                    if population == "Unknown":
+                        population = (result_data.get('region_prediction', {}).get('predicted_population') or
+                                     result_data.get('population_prediction', {}).get('predicted_population') or
+                                     result_data.get('predicted_population') or
+                                     result_data.get('population', "Unknown"))
         
         if gender == "Unknown" or population == "Unknown":
             return jsonify({"success": False, "error": f"Could not determine gender ({gender}) or population ({population}). Available columns: {list(df.columns)}"})
@@ -712,10 +928,71 @@ def generate_image_from_sample():
         if not api_key:
             return jsonify({"success": False, "error": "Gemini API key not configured"})
         
+        # First, get detailed physical characteristics using AI
         pop_description = POPULATION_INFO.get(population.upper(), {}).get("description", population)
+        
+        genai.configure(api_key=api_key)
+        model_name = os.environ.get("AGENT_MODEL") or os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-exp")
+        traits_model = genai.GenerativeModel(model_name=model_name)
+        
+        traits_prompt = f"""Analyze physical traits for: {gender}, {population} ({pop_description}).
+Return ONLY a JSON object with these exact fields (no markdown, no extra text):
+{{
+  "hair_color": "specific color",
+  "hair_texture": "specific texture",
+  "eye_color": "specific color",
+  "eye_shape": "specific shape",
+  "skin_tone": "specific tone with undertones",
+  "face_shape": "specific shape",
+  "nose": "specific characteristics",
+  "lips": "specific characteristics",
+  "build": "specific build type",
+  "distinctive_features": "any other notable features"
+}}
+
+Be specific and scientifically accurate for {pop_description} ancestry."""
+
+        traits_response = traits_model.generate_content(traits_prompt)
+        traits_text = traits_response.text.strip()
+        
+        # Extract JSON from response (handle markdown code blocks)
+        if "```json" in traits_text:
+            traits_text = traits_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in traits_text:
+            traits_text = traits_text.split("```")[1].split("```")[0].strip()
+        
+        try:
+            physical_traits = json.loads(traits_text)
+        except:
+            # Fallback to basic prompt if JSON parsing fails
+            physical_traits = None
+        
+        # Build detailed image generation prompt
         gender_word = "man" if gender.lower() == "male" else "woman" if gender.lower() == "female" else "person"
         
-        prompt = f"""Generate a realistic portrait photograph of an adult {gender_word} with typical {pop_description} ancestry features.
+        if physical_traits:
+            prompt = f"""Generate a realistic portrait photograph of an adult {gender_word} with {pop_description} ancestry.
+
+SPECIFIC PHYSICAL CHARACTERISTICS TO INCLUDE:
+- Hair: {physical_traits.get('hair_color', 'black')} color, {physical_traits.get('hair_texture', 'straight')} texture
+- Eyes: {physical_traits.get('eye_color', 'dark brown')} colored, {physical_traits.get('eye_shape', 'almond-shaped')} eyes
+- Skin: {physical_traits.get('skin_tone', 'medium')} skin tone
+- Face: {physical_traits.get('face_shape', 'oval')} face shape
+- Nose: {physical_traits.get('nose', 'medium bridge')}
+- Lips: {physical_traits.get('lips', 'medium fullness')}
+- Build: {physical_traits.get('build', 'average')} build
+- Additional features: {physical_traits.get('distinctive_features', 'natural appearance')}
+
+Style requirements:
+- Age: adult (25-40 years old)
+- Expression: neutral, natural, friendly
+- Lighting: soft, professional studio lighting
+- Background: simple, light colored background
+- Style: professional headshot portrait photograph
+- High quality, photorealistic image"""
+        else:
+            # Fallback to basic prompt
+            prompt = f"""Generate a realistic portrait photograph of an adult {gender_word} with typical {pop_description} ancestry features.
 Physical characteristics to include:
 - Natural skin tone typical of {pop_description} population
 - Appropriate facial features for this ethnic background

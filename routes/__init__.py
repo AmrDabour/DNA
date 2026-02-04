@@ -34,6 +34,7 @@ from .pages_routes import pages_bp  # Static pages (Privacy, Terms, Contact)
 from .vep_routes import vep_bp, vep_page_bp  # VEP Analysis routes
 from .admin_routes import admin_bp  # Admin dashboard and management
 from .tasks_routes import tasks_bp  # Celery task management routes
+from .user_memory_routes import user_memory_bp  # User memory for AI agent
 
 
 def register_blueprints(app):
@@ -61,7 +62,7 @@ def register_blueprints(app):
     app.register_blueprint(vep_page_bp)  # VEP page routes
     app.register_blueprint(admin_bp)  # Admin dashboard and management
     app.register_blueprint(tasks_bp)  # Celery task management
+    app.register_blueprint(user_memory_bp)  # User memory for AI agent personalization
     print(f"✅ Admin routes registered: {len([r for r in app.url_map.iter_rules() if 'admin' in str(r)])} routes")
     print(f"✅ Tasks routes registered: {len([r for r in app.url_map.iter_rules() if 'tasks' in str(r)])} routes")
-
-
+    print(f"✅ User memory routes registered")

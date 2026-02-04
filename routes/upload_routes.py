@@ -254,6 +254,14 @@ def save_analysis_to_database(patient_id, file_path, result_data, processing_tim
         db.session.add(analysis)
         db.session.commit()
         
+        # Update user's long-term memory for AI agent personalization
+        if user_id:
+            try:
+                from services.user_memory_service import update_user_memory_after_analysis
+                update_user_memory_after_analysis(user_id)
+            except Exception as mem_err:
+                print(f"⚠️ Failed to update user memory: {mem_err}")
+        
         print(f"✅ Analysis saved to database: {patient_id}")
         return analysis
         

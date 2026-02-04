@@ -66,6 +66,13 @@ class ImageGenerationInput(BaseModel):
     patient_id: str = Field(default="Unknown", description="Optional patient ID for the image")
 
 
+class ImageFromSampleInput(BaseModel):
+    """Input schema for generating images from sample files"""
+    sample_file: str = Field(description="Path to the sample CSV file")
+    gender: str = Field(default="", description="Optional gender override (Male or Female). If not provided, will try to extract from result file.")
+    population: str = Field(default="", description="Optional population override (e.g., CHD, CEU, YRI). If not provided, will try to extract from result file.")
+
+
 class SNPExplainInput(BaseModel):
     """Input schema for explaining SNP significance"""
     snp_id: str = Field(description="The SNP ID to explain (e.g., rs12345)")
@@ -84,14 +91,19 @@ def call_api(endpoint: str, method: str = "GET", data: dict = None) -> dict:
     """Make API call to the Flask backend"""
     url = f"{API_BASE_URL}{endpoint}"
     try:
+        print(f"🔧 Agent calling API: {method} {url}")
         if method == "GET":
             response = requests.get(url, timeout=120)
         else:
             response = requests.post(url, json=data, timeout=120)
-        return response.json()
-    except requests.exceptions.ConnectionError:
+        result = response.json()
+        print(f"✅ API response success: {result.get('success', 'N/A')}")
+        return result
+    except requests.exceptions.ConnectionError as e:
+        print(f"❌ API connection error: {e}")
         return {"success": False, "error": "Could not connect to API server"}
     except Exception as e:
+        print(f"❌ API error: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -213,8 +225,8 @@ def query_multiple_snps(sample_file: str, snp_ids: List[str]) -> Dict[str, Any]:
 @tool(args_schema=SampleFileInput)
 def analyze_snp_file(sample_file: str) -> Dict[str, Any]:
     """
-    Perform complete genetic analysis on an uploaded SNP file.
-    Analyzes the file and reports gender, ancestry/population, and genetic statistics.
+    Perform complete genetic analysis on an uploaded SNP file using ML models.
+    This runs the actual gender and ancestry prediction models to analyze the genetic data.
     Use this tool when user uploads a new SNP file or asks to analyze a sample.
     
     Args:
@@ -223,7 +235,54 @@ def analyze_snp_file(sample_file: str) -> Dict[str, Any]:
     Returns:
         dict: Complete analysis with Gender Prediction, ancestry prediction, and sample statistics
     """
-    return call_api("/api/analysis/analyze", "POST", {"sample_file": sample_file})
+    import json
+    
+    # Use the ML prediction endpoint that runs actual models
+    print(f"🧬 Running ML prediction on: {sample_file}")
+    result = call_api("/api/process_snp_file", "POST", {"file_path": sample_file})
+    
+    # If ML prediction fails, fall back to basic analysis
+    if not result.get("success"):
+        print(f"⚠️ ML prediction failed: {result.get('error')}, using basic analysis")
+        basic_result = call_api("/api/analysis/analyze", "POST", {"sample_file": sample_file})
+        basic_result["note"] = "ML prediction unavailable, showing basic statistics. Use 'full_genetic_report' for complete analysis with gender/ancestry."
+        return basic_result
+    
+    # Load the result file to get actual gender and population predictions
+    result_file = result.get("result_file")
+    if result_file:
+        try:
+            with open(result_file, "r") as f:
+                result_data = json.load(f)
+            
+            # Extract gender prediction
+            gender_data = result_data.get("sex_prediction", result_data.get("gender_prediction", {}))
+            if isinstance(gender_data, dict):
+                gender = gender_data.get("predicted_sex", gender_data.get("prediction", "Unknown"))
+            else:
+                gender = gender_data if gender_data else "Unknown"
+            
+            # Extract population/ancestry prediction
+            region_data = result_data.get("region_prediction", {})
+            if isinstance(region_data, dict):
+                prediction = region_data.get("prediction", region_data)
+                if isinstance(prediction, dict):
+                    population = prediction.get("predicted_population", prediction.get("population", "Unknown"))
+                else:
+                    population = prediction if prediction else "Unknown"
+            else:
+                population = "Unknown"
+            
+            # Add extracted values to result for agent context
+            result["gender"] = gender
+            result["population"] = population
+            result["sample_file"] = sample_file  # Ensure sample_file is in result
+            print(f"📊 Analysis result: gender={gender}, population={population}")
+            
+        except Exception as e:
+            print(f"⚠️ Could not read result file: {e}")
+    
+    return result
 
 
 @tool(args_schema=SampleFileInput)
@@ -356,20 +415,28 @@ def generate_person_image(gender: str, population: str, patient_id: str = "Unkno
     })
 
 
-@tool(args_schema=SampleFileInput)
-def generate_image_from_sample(sample_file: str) -> Dict[str, Any]:
+@tool(args_schema=ImageFromSampleInput)
+def generate_image_from_sample(sample_file: str, gender: str = "", population: str = "") -> Dict[str, Any]:
     """
     Generate an AI portrait image directly from a sample file.
-    Automatically extracts gender and population from the analyzed sample.
+    Automatically extracts gender and population from the analyzed result file.
+    If gender/population are provided, they will be used instead.
     Use this when user wants to see what someone with this genetic profile might look like.
     
     Args:
         sample_file: Path to the sample CSV file
+        gender: Optional gender override (Male or Female)
+        population: Optional population override (e.g., CHD, CEU, YRI)
         
     Returns:
         dict: Contains image_data (base64), image_path, and description
     """
-    return call_api("/api/predictions/generate-image-from-sample", "POST", {"sample_file": sample_file})
+    payload = {"sample_file": sample_file}
+    if gender:
+        payload["gender"] = gender
+    if population:
+        payload["population"] = population
+    return call_api("/api/predictions/generate-image-from-sample", "POST", payload)
 
 
 # ============================================================

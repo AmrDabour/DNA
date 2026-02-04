@@ -2,8 +2,10 @@
 Agent Routes - API endpoints for AI Agent chat
 """
 from flask import jsonify, request
+from flask_login import current_user
 import os
 import pandas as pd
+from datetime import datetime
 from werkzeug.utils import secure_filename
 from . import agent_bp
 
@@ -18,6 +20,60 @@ except ImportError:
 
 
 UPLOAD_FOLDER = "uploads"
+
+
+def _extract_and_store_file_context(tool_results, memory):
+    """
+    Extract file context from tool results and store in session memory.
+    This helps the agent remember which file is being analyzed across messages.
+    """
+    for tr in tool_results:
+        if not tr.get("success"):
+            continue
+            
+        result = tr.get("result", {})
+        if not isinstance(result, dict):
+            continue
+        
+        # Extract file path from tool arguments or result
+        tool_args = tr.get("args", {})
+        file_path = tool_args.get("sample_file") or result.get("file_path") or result.get("sample_file")
+        
+        if file_path:
+            # Store file context in session memory
+            memory.set_context("current_file", file_path)
+            print(f"📁 Stored current file in session: {file_path}")
+            
+            # Try to extract patient ID
+            patient_id = result.get("patient_id") or result.get("sample_id")
+            if patient_id:
+                memory.set_context("current_patient_id", patient_id)
+            
+            # Store analysis timestamp
+            memory.set_context("last_analysis_time", datetime.now().isoformat())
+            
+            # Store gender and population if available (check multiple possible keys)
+            gender = result.get("gender") or result.get("predicted_gender") or result.get("gender_prediction")
+            if gender:
+                memory.set_context("current_gender", gender)
+                print(f"🧬 Stored gender in session: {gender}")
+            
+            population = result.get("population") or result.get("predicted_population") or result.get("ancestry_prediction") or result.get("ancestry")
+            if population:
+                memory.set_context("current_population", population)
+                print(f"🌍 Stored population in session: {population}")
+            
+            # Also check for nested results (from ML prediction)
+            if result.get("results"):
+                nested = result.get("results", {})
+                if nested.get("gender") and not gender:
+                    memory.set_context("current_gender", nested.get("gender"))
+                    print(f"🧬 Stored gender from nested results: {nested.get('gender')}")
+                if nested.get("population") and not population:
+                    memory.set_context("current_population", nested.get("population"))
+                    print(f"🌍 Stored population from nested results: {nested.get('population')}")
+            
+            break  # Only store first file context found
 
 
 @agent_bp.route('/chat', methods=['POST'])
@@ -37,7 +93,33 @@ def chat():
     try:
         data = request.json
         message = data.get("message", "").strip()
-        session_id = data.get("session_id", "default")
+        
+        # Link session to authenticated user for persistent memory
+        # Guests use anonymous sessions (no long-term memory)
+        user_id = 0
+        try:
+            if current_user and current_user.is_authenticated:
+                user_id = current_user.id
+                session_id = f"user_{user_id}"
+                print(f"🧠 Authenticated user {user_id} ({current_user.username})")
+                
+                # Ensure long-term memory exists for this user (initialize if needed)
+                try:
+                    from services.user_memory_service import get_user_memory_service
+                    mem_service = get_user_memory_service()
+                    existing_memory = mem_service.get_user_memory(user_id)
+                    if not existing_memory:
+                        # Initialize memory with user's basic info
+                        mem_service.build_memory_from_analyses(user_id)
+                        print(f"🧠 Initialized long-term memory for user {user_id}")
+                except Exception as mem_init_err:
+                    print(f"⚠️ Memory init warning: {mem_init_err}")
+            else:
+                session_id = data.get("session_id", "default")
+                print(f"👤 Guest user, session: {session_id}")
+        except Exception as auth_err:
+            print(f"⚠️ Auth check error: {auth_err}")
+            session_id = data.get("session_id", "default")
         
         if not message:
             return jsonify({"success": False, "error": "Message cannot be empty"})
@@ -48,21 +130,43 @@ def chat():
         
         memory.add_user_message(message)
         
-        # Run agent workflow
-        result = workflow.run(message, session_id, chat_history)
+        # Run agent workflow with user_id for personalized memory injection
+        print(f"🚀 Running agent workflow for message: {message[:50]}...")
+        result = workflow.run(message, session_id, chat_history, user_id=user_id)
+        print(f"📤 Agent result: success={result.get('success')}, has_response={bool(result.get('response'))}")
+        
+        if not result.get("success"):
+            print(f"❌ Agent error: {result.get('error')}")
+            return jsonify({"success": False, "error": result.get("error", "Agent workflow failed")})
         
         response_text = result.get("response", "I apologize, I couldn't generate a response.")
+        print(f"💬 Response (first 100 chars): {response_text[:100]}...")
         memory.add_assistant_message(response_text)
         
         tools_used = []
         if result.get("tool_results"):
             tools_used = [tr.get("tool", "") for tr in result["tool_results"] if tr.get("success")]
+            
+            # Extract and store file context from tool results
+            _extract_and_store_file_context(result.get("tool_results", []), memory)
+            
+            # Update long-term memory if user is authenticated and analysis tool was used
+            if user_id > 0:
+                analysis_tools = ['analyze_snp_file', 'full_genetic_report']
+                if any(t in tools_used for t in analysis_tools):
+                    try:
+                        from services.user_memory_service import update_user_memory_after_analysis
+                        update_user_memory_after_analysis(user_id)
+                        print(f"🧠 Updated long-term memory for user {user_id}")
+                    except Exception as mem_err:
+                        print(f"⚠️ Failed to update long-term memory: {mem_err}")
         
         return jsonify({
             "success": True,
             "response": response_text,
             "tools_used": tools_used,
-            "iterations": result.get("iterations", 1)
+            "iterations": result.get("iterations", 1),
+            "user_id": user_id if user_id > 0 else None
         })
         
     except Exception as e:
@@ -82,7 +186,12 @@ def get_history():
         return jsonify({"success": False, "error": "Agent not available"})
     
     try:
-        session_id = request.args.get("session_id", "default")
+        # Use user-specific session if authenticated
+        if current_user.is_authenticated:
+            session_id = f"user_{current_user.id}"
+        else:
+            session_id = request.args.get("session_id", "default")
+        
         memory = get_memory(session_id)
         
         return jsonify({
@@ -107,8 +216,14 @@ def clear_chat():
         return jsonify({"success": False, "error": "Agent not available"})
     
     try:
-        data = request.json
-        session_id = data.get("session_id", "default")
+        data = request.json or {}
+        
+        # Use user-specific session if authenticated
+        if current_user.is_authenticated:
+            session_id = f"user_{current_user.id}"
+        else:
+            session_id = data.get("session_id", "default")
+        
         clear_memory(session_id)
         
         return jsonify({"success": True, "message": "Chat history cleared"})

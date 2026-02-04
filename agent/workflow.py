@@ -45,6 +45,9 @@ class AgentState(TypedDict):
     # Output
     response: str
     error: str
+    
+    # User context for personalization
+    user_id: int  # Authenticated user ID (0 for guests)
 
 
 # ============================================================
@@ -52,6 +55,10 @@ class AgentState(TypedDict):
 # ============================================================
 
 SYSTEM_PROMPT = """You are DNA Analysis Assistant, an expert AI agent specialized in genetic data analysis and predictions.
+
+{user_context}
+
+{current_file_context}
 
 ## Your Capabilities:
 {tools_description}
@@ -65,52 +72,56 @@ SYSTEM_PROMPT = """You are DNA Analysis Assistant, an expert AI agent specialize
 ## Available Populations:
 {populations}
 
-## IMPORTANT - Context Awareness:
-- **Remember previous analyses**: When a user asks for disease risk or physical characteristics after analyzing a sample, USE THE SAMPLE FILE PATH from the conversation.
-- **Use sample-based tools**: If the user previously uploaded/analyzed a file like "uploads/NA20805_GIH_Male.csv", use `get_disease_risk_from_sample` or `get_physical_traits_from_sample` with that file path.
-- **Don't ask for info you already have**: If you analyzed a sample showing "GIH Male", don't ask for gender and population again - use the sample file directly.
-- **For complete reports**: Use `full_genetic_report` to get analysis + physical traits + disease risks all at once.
+## CRITICAL RULES:
 
-## Tool Selection Guide:
+### 1. ALWAYS Know Your User:
+- If user asks "what is my name?" → Answer from the "Current User" section above
+- If user asks about their gender or ancestry and you have it in the user context → Tell them directly
+- Example: "What is my name?" → "Your name is [name from Current User section]"
 
-### 📊 Analysis Tools:
-- User uploads file → use `analyze_snp_file`
-- User asks for disease risk after analysis → use `get_disease_risk_from_sample` with the file path
-- User asks for physical traits after analysis → use `get_physical_traits_from_sample` with the file path  
-- User wants everything → use `full_genetic_report`
-- User provides gender + population directly → use `assess_genetic_disease_risk` or `predict_physical_characteristics`
+### 2. File Selection Rules:
+- **ALWAYS use the CURRENT SESSION FILE** shown above when user asks about their data
+- If no current file, check chat history for previously mentioned files
+- NEVER ask user to upload a file if one is already in the session
 
-### 🖼️ Image Generation Tools:
-- User asks "what do I look like" or "generate image" → use `generate_image_from_sample` with the sample file
-- User wants portrait from gender/population → use `generate_person_image`
+### 3. Tool Selection for Questions:
+| User Question | When to Answer Directly | When to Use Tool |
+|--------------|------------------------|------------------|
+| "What is my gender?" | Gender shown in ANALYSIS RESULTS above | No gender in context → use `full_genetic_report` |
+| "What is my ancestry?" | Ancestry shown in ANALYSIS RESULTS above | No ancestry in context → use `full_genetic_report` |
+| "Predict my traits" | Never - always need fresh prediction | `get_physical_traits_from_sample` |
+| "Disease risk?" | Never - always need fresh prediction | `get_disease_risk_from_sample` |
+| "Generate my image" | Never - always need to generate | `generate_image_from_sample` with gender/population from ANALYSIS RESULTS |
 
-### 🎓 Educational & Fun Tools:
-- User asks about a specific SNP → use `explain_snp_significance`
-- User wants fun facts about genetics → use `get_genetic_fun_facts` (topics: general, ancestry, health, traits, evolution)
-- User wants ancestry history → use `get_ancestry_deep_dive`
-- User wants to compare two samples → use `calculate_genetic_relatedness`
-- User asks what traits can be predicted → use `get_trait_predictions_guide`
-- User wants a quick summary → use `generate_genetic_summary_card`
+### 4. Image Generation Tool Usage:
+**CRITICAL:** When using `generate_image_from_sample`, ALWAYS provide gender and population:
+- If ANALYSIS RESULTS shows gender and population → Pass them as parameters
+- Example call: `generate_image_from_sample(sample_file="uploads/file.csv", gender="Male", population="CHD")`
+- DO NOT call without gender/population if they are available in the context
+
+### 5. IMPORTANT - When NOT to Use Tools:
+- **DO NOT call tools if you already have the answer in your context!**
+- If ANALYSIS RESULTS shows gender = "Male", just say "Based on your genetic analysis, you are Male"
+- If ANALYSIS RESULTS shows ancestry = "CHD", just say "Your predicted ancestry is CHD (Chinese in Denver)"
+- Only use tools when you need NEW information
+
+### 6. Context Awareness:
+- **Remember the file path**: When user mentions a file, remember it for follow-up questions
+- **Use the same file**: If user asks "what is my gender" after analyzing a file, use that SAME file path
+- **Don't ask for info you have**: If user's gender/ancestry is in the context, use it directly
 
 ## Guidelines:
-1. **Be helpful and informative**: Explain genetic concepts clearly when asked
-2. **Use tools when needed**: If user asks about specific data, use the appropriate tool
-3. **Be accurate**: Only provide information from actual data, don't make up results
-4. **Be cautious**: Genetic predictions are probabilistic, always mention this
-5. **Respect privacy**: Genetic data is sensitive, treat it appropriately
-6. **Format nicely**: Use markdown for better readability
-7. **Be fun**: Use emojis and engaging language when appropriate
-8. **Be educational**: Help users learn about genetics in an accessible way
+1. **Use tools proactively**: When asked about genetic info, CALL THE TOOL - don't say you can't determine it
+2. **Be accurate**: Only provide information from actual tool results OR from user context
+3. **Be cautious**: Genetic predictions are probabilistic, always mention this
+4. **Format nicely**: Use markdown for better readability
+5. **Be educational**: Help users learn about genetics
 
 ## Response Format:
 - Use clear, concise language
-- Use bullet points for lists
-- Use headers for organization when appropriate
-- Include relevant statistics when available
-- Always explain what the results mean
-- Use emojis to make responses more engaging 🧬
-
-Remember: You're here to help users understand genetic data and make predictions. Be friendly, accurate, educational, and FUN!
+- Use bullet points and headers
+- Include statistics from tool results
+- Use emojis to make responses engaging 🧬
 """
 
 
@@ -160,15 +171,69 @@ class DNAAgentWorkflow:
             callbacks=callbacks if callbacks else None
         )
     
-    def _get_system_prompt(self) -> str:
-        """Generate the system prompt with current context"""
+    def _get_system_prompt(self, user_id: int = None, session_id: str = None) -> str:
+        """Generate the system prompt with current context and user memory"""
         populations_list = []
         for code, info in POPULATION_INFO.items():
             populations_list.append(f"- **{code}** ({info['code']}): {info['description']}")
         
+        # Get current file context from session memory
+        current_file_context = ""
+        if session_id:
+            try:
+                memory = get_memory(session_id)
+                current_file = memory.get_context("current_file")
+                current_patient_id = memory.get_context("current_patient_id")
+                last_analysis_time = memory.get_context("last_analysis_time")
+                
+                if current_file:
+                    # Also get stored gender/population from analysis
+                    current_gender = memory.get_context("current_gender")
+                    current_population = memory.get_context("current_population")
+                    
+                    current_file_context = f"""## ⚠️ CURRENT SESSION FILE (USE THIS FILE PATH):
+- **Current File:** `{current_file}`
+- **Patient ID:** {current_patient_id or 'Unknown'}
+- **Last Analyzed:** {last_analysis_time or 'N/A'}"""
+                    
+                    # Add analysis results if available
+                    if current_gender or current_population:
+                        current_file_context += "\n\n### 🧬 ANALYSIS RESULTS FROM THIS FILE:"
+                        if current_gender:
+                            current_file_context += f"\n- **Predicted Gender:** {current_gender}"
+                        if current_population:
+                            current_file_context += f"\n- **Predicted Ancestry/Population:** {current_population}"
+                        current_file_context += "\n\n**⚠️ CRITICAL:** If user asks 'what is my gender?', answer with the gender above!"
+                        current_file_context += "\n**⚠️ CRITICAL:** If user asks about ancestry, answer with the population above!"
+                    
+                    current_file_context += f"""\n
+**IMPORTANT:** When user asks about gender, ancestry, traits, or diseases without specifying a file, 
+use THIS file path: `{current_file}`
+"""
+                    print(f"📁 Current file context: {current_file}, gender: {current_gender}, population: {current_population}")
+            except Exception as e:
+                print(f"⚠️ Failed to get file context: {e}")
+        
+        # Get user-specific context if authenticated
+        user_context = ""
+        if user_id and user_id > 0:
+            try:
+                from services.user_memory_service import get_user_memory_prompt
+                user_context = get_user_memory_prompt(user_id)
+                if user_context:
+                    print(f"🧠 Memory prompt loaded for user {user_id}: {len(user_context)} chars")
+                else:
+                    print(f"⚠️ No memory found for user {user_id}")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to load user memory: {e}")
+                print(f"❌ Failed to load user memory: {e}")
+        
         return SYSTEM_PROMPT.format(
             tools_description=get_tools_description(),
-            populations="\n".join(populations_list)
+            populations="\n".join(populations_list),
+            current_file_context=current_file_context,
+            user_context=user_context
         )
     
     def _build_graph(self) -> StateGraph:
@@ -222,10 +287,12 @@ class DNAAgentWorkflow:
         try:
             user_input = state["user_input"]
             chat_history = state.get("chat_history", [])
+            user_id = state.get("user_id", 0)
+            session_id = state.get("session_id", "")
             
-            # Build messages for LLM
+            # Build messages for LLM (with user memory and file context)
             messages = [
-                SystemMessage(content=self._get_system_prompt()),
+                SystemMessage(content=self._get_system_prompt(user_id=user_id, session_id=session_id)),
             ]
             
             # Add chat history
@@ -252,10 +319,13 @@ class DNAAgentWorkflow:
                         "id": tc.get("id", "")
                     })
             
+            # Extract text content (handle both string and list formats)
+            response_content = self._extract_text_content(response.content) if not tool_calls else ""
+            
             return {
                 "stage": "thinking" if tool_calls else "responding",
                 "tool_calls": tool_calls,
-                "response": response.content if not tool_calls else "",
+                "response": response_content,
                 "iteration": state.get("iteration", 0) + 1
             }
             
@@ -264,6 +334,38 @@ class DNAAgentWorkflow:
                 "stage": "error",
                 "error": str(e)
             }
+    
+    def _extract_text_content(self, content) -> str:
+        """Extract text from response content (handles both string and list formats from Gemini)"""
+        print(f"🔍 _extract_text_content called with type: {type(content)}, value: {str(content)[:200]}")
+        
+        if content is None:
+            return ""
+        
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            if not content:  # Empty list
+                print("⚠️ Empty list received from LLM")
+                return ""
+            
+            # New Gemini format: list of dicts with 'type' and 'text' keys
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict):
+                    # Check for 'text' key (common format)
+                    if 'text' in item:
+                        text_parts.append(item.get('text', ''))
+                    # Also check for 'content' key
+                    elif 'content' in item:
+                        text_parts.append(item.get('content', ''))
+                elif isinstance(item, str):
+                    text_parts.append(item)
+            result = '\n'.join(text_parts)
+            print(f"📝 Extracted text (first 100): {result[:100]}")
+            return result
+        else:
+            return str(content)
     
     def _use_tools_node(self, state: AgentState) -> Dict[str, Any]:
         """Execute the tools requested by the LLM"""
@@ -327,9 +429,11 @@ class DNAAgentWorkflow:
                     "stage": "complete"
                 }
             
-            # Build messages
+            # Build messages - IMPORTANT: include user_id and session_id for personalization
+            user_id = state.get("user_id", 0)
+            session_id = state.get("session_id", "")
             messages = [
-                SystemMessage(content=self._get_system_prompt()),
+                SystemMessage(content=self._get_system_prompt(user_id=user_id, session_id=session_id)),
             ]
             
             # Add chat history
@@ -362,14 +466,45 @@ class DNAAgentWorkflow:
                 messages.append(HumanMessage(content="Based on the tool results above, please provide a clear, well-formatted response in markdown to my original question. Use headers, bullet points, and emojis for better readability."))
             
             # Generate response
+            print(f"🤖 Generating response with {len(messages)} messages...")
             response = self.llm.invoke(messages)
+            print(f"🤖 Raw response content type: {type(response.content)}, content: {str(response.content)[:200]}")
+            
+            extracted_response = self._extract_text_content(response.content)
+            
+            # If response is empty, provide a fallback
+            if not extracted_response or not extracted_response.strip():
+                print("⚠️ Empty response from LLM, using tool results directly")
+                # Try to format tool results as the response
+                if tool_results:
+                    fallback_parts = ["Based on my analysis:\n"]
+                    for tr in tool_results:
+                        if tr.get("success") and tr.get("result"):
+                            result = tr.get("result", {})
+                            if isinstance(result, dict):
+                                if result.get("error"):
+                                    fallback_parts.append(f"⚠️ {tr['tool']}: {result.get('error')}")
+                                else:
+                                    # Extract key info from result
+                                    for key in ['message', 'description', 'summary', 'content']:
+                                        if result.get(key):
+                                            fallback_parts.append(f"• {result.get(key)}")
+                                            break
+                                    else:
+                                        fallback_parts.append(f"• Tool {tr['tool']} completed successfully")
+                    extracted_response = "\n".join(fallback_parts)
+                else:
+                    extracted_response = "I processed your request but couldn't generate a detailed response. Please try again."
             
             return {
-                "response": response.content,
+                "response": extracted_response,
                 "stage": "complete"
             }
             
         except Exception as e:
+            print(f"❌ Error in _generate_response_node: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "stage": "error",
                 "error": str(e)
@@ -429,7 +564,8 @@ class DNAAgentWorkflow:
     def run(self, 
             user_input: str, 
             session_id: str, 
-            chat_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+            chat_history: List[Dict[str, str]] = None,
+            user_id: int = 0) -> Dict[str, Any]:
         """
         Run the agent workflow
         
@@ -437,6 +573,7 @@ class DNAAgentWorkflow:
             user_input: The user's message
             session_id: Session identifier for memory
             chat_history: Previous conversation messages
+            user_id: Authenticated user ID (0 for guests, no memory)
             
         Returns:
             dict: Contains response and other metadata
@@ -454,7 +591,8 @@ class DNAAgentWorkflow:
             "tool_results": [],
             "context": {},
             "response": "",
-            "error": ""
+            "error": "",
+            "user_id": user_id
         }
         
         # Run the graph with LangSmith tracing

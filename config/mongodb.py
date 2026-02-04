@@ -93,6 +93,24 @@ def get_snp_collection():
     return db['snps']
 
 
+def get_user_memory_collection():
+    """
+    Get the user memory collection from MongoDB.
+    Used for storing persistent user-specific data for the AI agent.
+    
+    Returns:
+        Collection: User memory collection
+    """
+    db = get_mongo_db()
+    collection = db['user_memories']
+    
+    # Ensure indexes for efficient queries
+    collection.create_index('user_id', unique=True)
+    collection.create_index('updated_at')
+    
+    return collection
+
+
 def wait_for_mongodb(max_retries=30, retry_interval=2):
     """
     Wait for MongoDB to be available (useful in Docker/K8s environments).

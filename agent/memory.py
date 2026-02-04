@@ -146,11 +146,14 @@ class ChatMemory:
         """Set context variable"""
         self.context[key] = value
         self._dirty = True
-        self._save_to_redis()
+        saved = self._save_to_redis()
+        logger.info(f"Set context '{key}' = '{value}' (saved to Redis: {saved})")
     
     def get_context(self, key: str, default=None):
         """Get context variable"""
-        return self.context.get(key, default)
+        value = self.context.get(key, default)
+        logger.debug(f"Get context '{key}' = '{value}' (available keys: {list(self.context.keys())})")
+        return value
     
     def clear_context(self) -> None:
         """Clear all context"""
@@ -196,18 +199,21 @@ _memory_store: Dict[str, ChatMemory] = {}
 def get_memory(session_id: str, window_size: int = 20) -> ChatMemory:
     """
     Get or create memory for a session.
-    Loads from Redis if available, falls back to in-memory.
+    ALWAYS loads from Redis first to ensure multi-worker consistency,
+    then caches in-memory for performance within the same worker.
     """
-    # Check in-memory store first
+    # ALWAYS try to load from Redis first for multi-worker consistency
+    redis_memory = ChatMemory._load_from_redis(session_id, window_size)
+    
+    if redis_memory:
+        # Update in-memory cache with latest from Redis
+        _memory_store[session_id] = redis_memory
+        logger.debug(f"Loaded memory for session {session_id} from Redis (context keys: {list(redis_memory.context.keys())})")
+        return redis_memory
+    
+    # Check in-memory store if Redis didn't have it
     if session_id in _memory_store:
         return _memory_store[session_id]
-    
-    # Try to load from Redis
-    memory = ChatMemory._load_from_redis(session_id, window_size)
-    if memory:
-        _memory_store[session_id] = memory
-        logger.debug(f"Loaded memory for session {session_id} from Redis")
-        return memory
     
     # Create new memory
     memory = ChatMemory(window_size=window_size, session_id=session_id)
