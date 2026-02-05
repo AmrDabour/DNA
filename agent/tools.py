@@ -419,8 +419,7 @@ def generate_person_image(gender: str, population: str, patient_id: str = "Unkno
 def generate_image_from_sample(sample_file: str, gender: str = "", population: str = "") -> Dict[str, Any]:
     """
     Generate an AI portrait image directly from a sample file.
-    Automatically extracts gender and population from the analyzed result file.
-    If gender/population are provided, they will be used instead.
+    SMART TOOL: If gender/population are not provided, automatically runs ML prediction first!
     Use this when user wants to see what someone with this genetic profile might look like.
     
     Args:
@@ -431,11 +430,50 @@ def generate_image_from_sample(sample_file: str, gender: str = "", population: s
     Returns:
         dict: Contains image_data (base64), image_path, and description
     """
-    payload = {"sample_file": sample_file}
-    if gender:
-        payload["gender"] = gender
-    if population:
-        payload["population"] = population
+    # If gender/population not provided, run full genetic report to get ML predictions
+    if not gender or not population:
+        print(f"🔍 Gender or population not provided. Running ML prediction for {sample_file}...")
+        
+        # Call full_genetic_report which runs ML prediction if needed
+        analysis_result = call_api("/api/predictions/full-report", "POST", {"sample_file": sample_file})
+        
+        if analysis_result.get("success"):
+            # Extract gender and population from the report
+            gender = gender or analysis_result.get("gender")
+            population = population or analysis_result.get("population")
+            
+            # If still not found, check nested structures
+            if not gender:
+                gender = (analysis_result.get("analysis", {}).get("gender", {}).get("predicted_sex") or
+                         analysis_result.get("sex_prediction", {}).get("predicted_sex") or
+                         "Unknown")
+            if not population:
+                population = (analysis_result.get("analysis", {}).get("ancestry", {}).get("predicted_population") or
+                             analysis_result.get("region_prediction", {}).get("prediction", {}).get("predicted_population") or
+                             "Unknown")
+            
+            print(f"✅ ML analysis completed: gender={gender}, population={population}")
+        else:
+            return {
+                "success": False,
+                "error": f"Failed to analyze file: {analysis_result.get('error', 'Unknown error')}"
+            }
+    
+    # Check if we have valid gender and population now
+    if gender == "Unknown" or population == "Unknown" or not gender or not population:
+        return {
+            "success": False,
+            "error": f"ML prediction failed to determine gender ({gender}) or population ({population}). The SNP file may not have enough markers for prediction."
+        }
+    
+    # Now generate the image with gender/population
+    payload = {
+        "sample_file": sample_file,
+        "gender": gender,
+        "population": population
+    }
+    
+    print(f"🎨 Generating image with gender={gender}, population={population}...")
     return call_api("/api/predictions/generate-image-from-sample", "POST", payload)
 
 
