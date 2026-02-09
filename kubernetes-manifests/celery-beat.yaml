@@ -42,7 +42,7 @@ spec:
             runAsUser: 1000
       containers:
       - name: celery-beat
-        image: amrdabour/genovaai:v1.2
+        image: amrdabour/genovaai:v1.3
         imagePullPolicy: IfNotPresent
         command:
         - celery
@@ -50,6 +50,8 @@ spec:
         - celery_app
         - beat
         - --loglevel=INFO
+        - --pidfile=
+        - --schedule=/tmp/celerybeat-schedule
         envFrom:
         - configMapRef:
             name: genovaai-config

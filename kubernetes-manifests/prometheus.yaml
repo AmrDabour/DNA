@@ -20,8 +20,9 @@ data:
     rule_files: []
 
     scrape_configs:
-      # Prometheus itself
+      # Prometheus itself (metrics at /prometheus/metrics due to --web.route-prefix)
       - job_name: 'prometheus'
+        metrics_path: '/prometheus/metrics'
         static_configs:
           - targets: ['localhost:9090']
 
@@ -44,27 +45,12 @@ data:
             action: keep
           - source_labels: [__meta_kubernetes_pod_ip]
             target_label: __address__
-            replacement: $1:5000
+            replacement: $1:5001
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: instance
 
-      # Celery Workers
-      - job_name: 'celery-workers'
-        kubernetes_sd_configs:
-          - role: pod
-            namespaces:
-              names:
-                - genovaai
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_label_app]
-            regex: genovaai
-            action: keep
-          - source_labels: [__meta_kubernetes_pod_label_component]
-            regex: celery-worker
-            action: keep
-          - source_labels: [__meta_kubernetes_pod_ip]
-            target_label: __address__
-            replacement: $1:9808
+      # NOTE: celery-workers job removed - no Celery metrics exporter deployed
+      # To re-enable, add a celery-exporter sidecar and uncomment this section
 
       # PostgreSQL
       - job_name: 'postgres'
@@ -242,7 +228,7 @@ spec:
             - "--web.console.templates=/usr/share/prometheus/consoles"
             - "--web.enable-lifecycle"
             - "--web.external-url=/prometheus/"
-            - "--web.route-prefix=/"
+            - "--web.route-prefix=/prometheus/"
           ports:
             - containerPort: 9090
               name: web
@@ -262,13 +248,13 @@ spec:
               ephemeral-storage: "2Gi"
           readinessProbe:
             httpGet:
-              path: /-/ready
+              path: /prometheus/-/ready
               port: 9090
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /-/healthy
+              path: /prometheus/-/healthy
               port: 9090
             initialDelaySeconds: 15
             periodSeconds: 15
@@ -287,7 +273,7 @@ metadata:
   labels:
     app: prometheus
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   ports:
     - port: 9090
       targetPort: 9090

@@ -369,6 +369,17 @@ def serve_upload(filename):
 
 
 # ============================================================
+# Prometheus Metrics (auto-exposes /metrics endpoint)
+# ============================================================
+try:
+    from prometheus_flask_exporter import PrometheusMetrics
+    metrics = PrometheusMetrics(app, path='/metrics')
+    metrics.info('genovaai_app_info', 'GenovaAI Application Info', version='1.0.0')
+    print("✅ Prometheus metrics enabled at /metrics")
+except ImportError:
+    print("⚠️ prometheus_flask_exporter not available. /metrics endpoint disabled.")
+
+# ============================================================
 # Health Check Endpoints
 # ============================================================
 

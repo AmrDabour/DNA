@@ -20,9 +20,8 @@ spec:
       labels:
         app: genovaai
         component: celery-worker
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9808"
+      # NOTE: prometheus scrape annotations removed - no celery metrics exporter deployed
+      # To re-enable, add a celery-exporter sidecar container
     spec:
       securityContext:
         runAsNonRoot: true

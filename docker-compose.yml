@@ -54,8 +54,6 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./database/init_scripts:/docker-entrypoint-initdb.d:ro
       - postgres-backups:/backups
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-genovaai_user} -d ${POSTGRES_DB:-genovaai}"]
       interval: 10s
@@ -85,8 +83,6 @@ services:
     volumes:
       - mongodb-data:/data/db
       - mongodb-config:/data/configdb
-    ports:
-      - "27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -110,8 +106,6 @@ services:
     container_name: genovaai-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -138,8 +132,6 @@ services:
     image: amrdabour/genovaai:${TAG:-latest}
     container_name: genovaai-app
     restart: unless-stopped
-    ports:
-      - "5001:5001"
     environment:
       # Flask Configuration - PRODUCTION
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-CHANGE_ME_IN_PRODUCTION}

@@ -71,6 +71,9 @@ flask-session>=0.8.0
 # System Monitoring
 psutil>=5.9.0
 
+# Prometheus Metrics
+prometheus_flask_exporter>=0.23.0
+
 # Celery Task Queue with RabbitMQ
 celery>=5.3.0
 kombu>=5.3.0

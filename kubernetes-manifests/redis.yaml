@@ -90,6 +90,27 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 5
+        # Prometheus Redis Exporter sidecar
+        - name: redis-exporter
+          image: oliver006/redis_exporter:v1.66.0-alpine
+          ports:
+            - containerPort: 9121
+              name: metrics
+          env:
+            - name: REDIS_ADDR
+              value: "redis://localhost:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: genovaai-secrets
+                  key: REDIS_PASSWORD
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
   volumeClaimTemplates:
     - metadata:
         name: redis-data

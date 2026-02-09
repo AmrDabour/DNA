@@ -20,6 +20,23 @@ spec:
   selector:
     app: rabbitmq
 ---
+# RabbitMQ Management UI LoadBalancer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-management
+  namespace: genovaai
+  labels:
+    app: rabbitmq
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 15672
+      targetPort: 15672
+      name: management
+  selector:
+    app: rabbitmq
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

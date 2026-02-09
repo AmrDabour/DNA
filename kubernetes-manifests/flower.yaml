@@ -42,6 +42,7 @@ spec:
         - celery_app
         - flower
         - --port=5555
+        - --url_prefix=flower
         ports:
         - containerPort: 5555
           name: flower
@@ -61,14 +62,14 @@ spec:
             ephemeral-storage: "256Mi"
         readinessProbe:
           httpGet:
-            path: /healthcheck
+            path: /flower/healthcheck
             port: 5555
           initialDelaySeconds: 15
           periodSeconds: 10
           timeoutSeconds: 5
         livenessProbe:
           httpGet:
-            path: /healthcheck
+            path: /flower/healthcheck
             port: 5555
           initialDelaySeconds: 30
           periodSeconds: 15
@@ -83,7 +84,7 @@ metadata:
     app: genovaai
     component: flower
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   ports:
     - port: 5555
       targetPort: 5555
