@@ -379,6 +379,19 @@ try:
 except ImportError:
     print("⚠️ prometheus_flask_exporter not available. /metrics endpoint disabled.")
 
+# Custom application-level Prometheus metrics
+try:
+    from utils.metrics import metrics_collector, setup_flask_metrics
+    setup_flask_metrics(app)
+
+    # Record ML model load status
+    metrics_collector.track_model_load('gender', duration=0.0, loaded=gender_loaded)
+    metrics_collector.track_model_load('ancestry', duration=0.0, loaded=ancestry_loaded)
+
+    print("✅ Custom Prometheus metrics registered")
+except ImportError:
+    print("⚠️ Custom metrics module not available.")
+
 # ============================================================
 # Health Check Endpoints
 # ============================================================
@@ -404,18 +417,39 @@ def detailed_health_check():
     try:
         db.session.execute(db.text("SELECT 1"))
         health["checks"]["database"] = {"status": "healthy"}
+        try:
+            from utils.metrics import metrics_collector
+            metrics_collector.set_health_status('postgres', True)
+        except ImportError:
+            pass
     except Exception as e:
         health["checks"]["database"] = {"status": "unhealthy", "error": str(e)}
         health["status"] = "degraded"
+        try:
+            from utils.metrics import metrics_collector
+            metrics_collector.set_health_status('postgres', False)
+            metrics_collector.track_db_error('postgres')
+        except ImportError:
+            pass
     
     # MongoDB check
     try:
         from config.mongodb import is_mongodb_available
         if is_mongodb_available():
             health["checks"]["mongodb"] = {"status": "healthy"}
+            try:
+                from utils.metrics import metrics_collector
+                metrics_collector.set_health_status('mongodb', True)
+            except ImportError:
+                pass
         else:
             health["checks"]["mongodb"] = {"status": "unhealthy"}
             health["status"] = "degraded"
+            try:
+                from utils.metrics import metrics_collector
+                metrics_collector.set_health_status('mongodb', False)
+            except ImportError:
+                pass
     except Exception as e:
         health["checks"]["mongodb"] = {"status": "unknown", "error": str(e)}
     
@@ -423,6 +457,11 @@ def detailed_health_check():
     if REDIS_MODULE_AVAILABLE:
         redis_status = redis_health_check()
         health["checks"]["redis"] = redis_status
+        try:
+            from utils.metrics import metrics_collector
+            metrics_collector.set_health_status('redis', redis_status.get("status") == "healthy")
+        except ImportError:
+            pass
         if redis_status.get("status") != "healthy":
             # Redis is optional, so only mark as degraded
             if health["status"] == "healthy":
@@ -439,6 +478,11 @@ def detailed_health_check():
 
 @app.errorhandler(404)
 def page_not_found(e):
+    try:
+        from utils.metrics import metrics_collector
+        metrics_collector.track_error('404', request.path)
+    except ImportError:
+        pass
     # Return JSON for API requests, HTML for browser requests
     if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
         return jsonify({"success": False, "error": "Resource not found", "path": request.path}), 404
@@ -450,6 +494,11 @@ def internal_server_error(e):
     import traceback
     error_trace = traceback.format_exc()
     app.logger.error(f"500 Error: {str(e)}\n{error_trace}")
+    try:
+        from utils.metrics import metrics_collector
+        metrics_collector.track_error('500', request.path)
+    except ImportError:
+        pass
     # Return JSON for API requests, HTML for browser requests
     if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
         return jsonify({"success": False, "error": f"Internal server error: {str(e)}", "traceback": error_trace}), 500
@@ -461,6 +510,11 @@ def handle_exception(e):
     import traceback
     error_trace = traceback.format_exc()
     app.logger.error(f"Unhandled Exception: {str(e)}\n{error_trace}")
+    try:
+        from utils.metrics import metrics_collector
+        metrics_collector.track_error(type(e).__name__, request.path)
+    except ImportError:
+        pass
     # Return JSON for API requests
     if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
         return jsonify({"success": False, "error": f"Unexpected error: {str(e)}", "traceback": error_trace}), 500

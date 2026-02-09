@@ -24,6 +24,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Install prometheus_client separately (layer cached independently)
+RUN pip install --no-cache-dir prometheus_client>=0.20.0
+
 # Copy application code
 COPY . .
 

@@ -138,7 +138,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "rate(http_requests_total{job=\"genovaai\"}[5m])",
+              "expr": "rate(flask_http_request_total{job=\"genovaai\"}[5m])",
               "legendFormat": "{{method}} {{endpoint}}",
               "refId": "A"
             }
@@ -323,7 +323,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "redis_memory_used_bytes / redis_memory_max_bytes * 100",
+              "expr": "(redis_memory_used_bytes / redis_memory_max_bytes * 100) and (redis_memory_max_bytes > 0)",
               "legendFormat": "Redis Memory",
               "refId": "A"
             }

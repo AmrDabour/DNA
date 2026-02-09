@@ -17,7 +17,9 @@ data:
         - static_configs:
             - targets: []
 
-    rule_files: []
+    rule_files:
+      - '/etc/prometheus/alert_rules.yml'
+      - '/etc/prometheus/recording_rules.yml'
 
     scrape_configs:
       # Prometheus itself (metrics at /prometheus/metrics due to --web.route-prefix)
@@ -155,6 +157,406 @@ data:
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: kubernetes_pod_name
+
+  # ============================================================
+  # Alerting Rules
+  # ============================================================
+  alert_rules.yml: |
+    groups:
+      # --- Application Health Alerts ---
+      - name: genovaai_application_alerts
+        rules:
+          - alert: HighErrorRate
+            expr: rate(genovaai_errors_total[5m]) > 0.5
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High application error rate"
+              description: "GenovaAI is experiencing {{ $value | printf \"%.2f\" }} errors/sec over the last 5 minutes."
+
+          - alert: HighResponseLatency
+            expr: histogram_quantile(0.95, rate(genovaai_http_request_duration_seconds_bucket[5m])) > 5
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High HTTP response latency (p95 > 5s)"
+              description: "95th percentile response time is {{ $value | printf \"%.2f\" }}s."
+
+          - alert: HighRequestRate5xx
+            expr: rate(genovaai_http_requests_total{status_code=~"5.."}[5m]) / rate(genovaai_http_requests_total[5m]) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "More than 5% of requests are returning 5xx errors"
+              description: "{{ $value | printf \"%.1f\" }}% of requests are failing with server errors."
+
+          - alert: ApplicationDown
+            expr: up{job="genovaai"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "GenovaAI application is down"
+              description: "The GenovaAI web application has been unreachable for 2 minutes."
+
+          - alert: HealthCheckDegraded
+            expr: genovaai_health_check_status == 0
+            for: 3m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Service health check failing"
+              description: "Health check for {{ $labels.service }} has been unhealthy for 3 minutes."
+
+      # --- Prediction Alerts ---
+      - name: genovaai_prediction_alerts
+        rules:
+          - alert: HighPredictionFailureRate
+            expr: rate(genovaai_predictions_total{status="failure"}[10m]) / rate(genovaai_predictions_total[10m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High prediction failure rate for {{ $labels.prediction_type }}"
+              description: "{{ $value | printf \"%.1f\" }}% of {{ $labels.prediction_type }} predictions are failing."
+
+          - alert: SlowPredictions
+            expr: histogram_quantile(0.95, rate(genovaai_prediction_duration_seconds_bucket[10m])) > 30
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Slow predictions detected"
+              description: "95th percentile prediction time for {{ $labels.prediction_type }} is {{ $value | printf \"%.1f\" }}s."
+
+          - alert: LowPredictionConfidence
+            expr: histogram_quantile(0.5, rate(genovaai_prediction_confidence_bucket[30m])) < 0.5
+            for: 15m
+            labels:
+              severity: info
+            annotations:
+              summary: "Low median prediction confidence"
+              description: "Median confidence for {{ $labels.prediction_type }} predictions is {{ $value | printf \"%.2f\" }}."
+
+          - alert: NoPredictionsInLastHour
+            expr: increase(genovaai_predictions_total[1h]) == 0
+            for: 1h
+            labels:
+              severity: info
+            annotations:
+              summary: "No predictions in the last hour"
+              description: "No {{ $labels.prediction_type }} predictions have been made in the last hour."
+
+      # --- ML Model Alerts ---
+      - name: genovaai_model_alerts
+        rules:
+          - alert: MLModelNotLoaded
+            expr: genovaai_model_loaded == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "ML model not loaded: {{ $labels.model_type }}"
+              description: "The {{ $labels.model_type }} prediction model has been unloaded for 5 minutes."
+
+      # --- File Upload Alerts ---
+      - name: genovaai_upload_alerts
+        rules:
+          - alert: HighUploadFailureRate
+            expr: rate(genovaai_file_uploads_total{status="failure"}[10m]) / rate(genovaai_file_uploads_total[10m]) > 0.2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High file upload failure rate"
+              description: "{{ $value | printf \"%.1f\" }}% of file uploads are failing."
+
+          - alert: LargeFileUpload
+            expr: genovaai_file_upload_size_bytes_bucket{le="104857600"} - genovaai_file_upload_size_bytes_bucket{le="52428800"} > 0
+            labels:
+              severity: info
+            annotations:
+              summary: "Large file upload detected (>50MB)"
+              description: "A file larger than 50MB was uploaded."
+
+      # --- SNP Analysis Alerts ---
+      - name: genovaai_snp_alerts
+        rules:
+          - alert: SlowSNPAnalysis
+            expr: histogram_quantile(0.95, rate(genovaai_snp_analysis_duration_seconds_bucket[15m])) > 300
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "SNP analysis taking too long"
+              description: "95th percentile SNP analysis time is {{ $value | printf \"%.0f\" }}s."
+
+          - alert: VEPAnnotationFailures
+            expr: rate(genovaai_vep_annotations_total{status="failure"}[15m]) > 0.1
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "VEP annotation failures detected"
+              description: "VEP annotations are failing at {{ $value | printf \"%.2f\" }}/sec."
+
+      # --- Database Alerts ---
+      - name: genovaai_database_alerts
+        rules:
+          - alert: DatabaseConnectionErrors
+            expr: rate(genovaai_db_connection_errors_total[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Database connection errors for {{ $labels.database }}"
+              description: "{{ $labels.database }} is experiencing {{ $value | printf \"%.2f\" }} connection errors/sec."
+
+          - alert: SlowDatabaseQueries
+            expr: histogram_quantile(0.95, rate(genovaai_db_query_duration_seconds_bucket[5m])) > 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Slow database queries on {{ $labels.database }}"
+              description: "95th percentile query time for {{ $labels.database }} {{ $labels.operation }} is {{ $value | printf \"%.3f\" }}s."
+
+          - alert: PostgresDown
+            expr: up{job="postgres"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "PostgreSQL is down"
+              description: "PostgreSQL exporter has been unreachable for 2 minutes."
+
+          - alert: MongoDBDown
+            expr: up{job="mongodb"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "MongoDB is down"
+              description: "MongoDB exporter has been unreachable for 2 minutes."
+
+          - alert: RedisDown
+            expr: up{job="redis"} == 0
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Redis is down"
+              description: "Redis exporter has been unreachable for 2 minutes."
+
+      # --- AI API Alerts ---
+      - name: genovaai_ai_api_alerts
+        rules:
+          - alert: HighAIAPIFailureRate
+            expr: rate(genovaai_ai_api_calls_total{status="failure"}[10m]) / rate(genovaai_ai_api_calls_total[10m]) > 0.2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High AI API failure rate for {{ $labels.endpoint }}"
+              description: "{{ $value | printf \"%.1f\" }}% of AI API calls to {{ $labels.endpoint }} are failing."
+
+          - alert: SlowAIAPIResponses
+            expr: histogram_quantile(0.95, rate(genovaai_ai_api_duration_seconds_bucket[10m])) > 60
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Slow AI API responses"
+              description: "95th percentile AI API response time is {{ $value | printf \"%.0f\" }}s."
+
+          - alert: HighTokenConsumption
+            expr: rate(genovaai_ai_api_tokens_total[1h]) > 100000
+            for: 30m
+            labels:
+              severity: info
+            annotations:
+              summary: "High AI token consumption"
+              description: "AI API is consuming {{ $value | printf \"%.0f\" }} tokens/hour."
+
+      # --- Celery/Task Queue Alerts ---
+      - name: genovaai_celery_alerts
+        rules:
+          - alert: CeleryTaskFailures
+            expr: rate(genovaai_celery_tasks_total{status="failure"}[10m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Celery task failures for {{ $labels.task_name }}"
+              description: "Task {{ $labels.task_name }} is failing at {{ $value | printf \"%.2f\" }}/sec."
+
+          - alert: CeleryQueueBacklog
+            expr: genovaai_celery_queue_length > 50
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Celery queue backlog detected"
+              description: "Queue {{ $labels.queue_name }} has {{ $value }} pending tasks."
+
+          - alert: RabbitMQDown
+            expr: up{job="rabbitmq"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "RabbitMQ is down"
+              description: "RabbitMQ exporter has been unreachable for 2 minutes."
+
+      # --- Infrastructure Alerts ---
+      - name: genovaai_infrastructure_alerts
+        rules:
+          - alert: NginxDown
+            expr: up{job="nginx"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Nginx is down"
+              description: "Nginx exporter has been unreachable for 2 minutes."
+
+          - alert: HighMemoryUsage
+            expr: process_resident_memory_bytes{job="genovaai"} > 1073741824
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage in GenovaAI"
+              description: "GenovaAI process is using {{ $value | humanize }} of memory."
+
+          - alert: PrometheusTargetDown
+            expr: up == 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Prometheus target down: {{ $labels.job }}"
+              description: "Target {{ $labels.instance }} in job {{ $labels.job }} has been down for 5 minutes."
+
+      # --- User Activity Alerts ---
+      - name: genovaai_user_alerts
+        rules:
+          - alert: HighLoginFailureRate
+            expr: rate(genovaai_user_logins_total{status="failed"}[15m]) > 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High login failure rate detected"
+              description: "{{ $value | printf \"%.1f\" }} failed logins/sec — possible brute force attack."
+
+          - alert: NoUserActivity
+            expr: increase(genovaai_http_requests_total[2h]) == 0
+            for: 2h
+            labels:
+              severity: info
+            annotations:
+              summary: "No user activity in the last 2 hours"
+              description: "The application has received no HTTP requests for 2 hours."
+
+  # ============================================================
+  # Recording Rules (pre-computed for Grafana dashboards)
+  # ============================================================
+  recording_rules.yml: |
+    groups:
+      - name: genovaai_recording_rules
+        interval: 30s
+        rules:
+          # Request rate per second (last 5 minutes)
+          - record: genovaai:http_request_rate_5m
+            expr: rate(genovaai_http_requests_total[5m])
+
+          # Error rate per second (last 5 minutes)
+          - record: genovaai:error_rate_5m
+            expr: rate(genovaai_errors_total[5m])
+
+          # Error ratio (errors / total requests)
+          - record: genovaai:error_ratio_5m
+            expr: rate(genovaai_errors_total[5m]) / rate(genovaai_http_requests_total[5m])
+
+          # Average request latency (last 5 minutes)
+          - record: genovaai:http_request_avg_duration_5m
+            expr: rate(genovaai_http_request_duration_seconds_sum[5m]) / rate(genovaai_http_request_duration_seconds_count[5m])
+
+          # P50 request latency
+          - record: genovaai:http_request_p50_duration_5m
+            expr: histogram_quantile(0.5, rate(genovaai_http_request_duration_seconds_bucket[5m]))
+
+          # P95 request latency
+          - record: genovaai:http_request_p95_duration_5m
+            expr: histogram_quantile(0.95, rate(genovaai_http_request_duration_seconds_bucket[5m]))
+
+          # P99 request latency
+          - record: genovaai:http_request_p99_duration_5m
+            expr: histogram_quantile(0.99, rate(genovaai_http_request_duration_seconds_bucket[5m]))
+
+          # Prediction success rate
+          - record: genovaai:prediction_success_rate_10m
+            expr: rate(genovaai_predictions_total{status="success"}[10m]) / rate(genovaai_predictions_total[10m])
+
+          # Average prediction duration
+          - record: genovaai:prediction_avg_duration_10m
+            expr: rate(genovaai_prediction_duration_seconds_sum[10m]) / rate(genovaai_prediction_duration_seconds_count[10m])
+
+          # Average prediction confidence
+          - record: genovaai:prediction_avg_confidence_10m
+            expr: rate(genovaai_prediction_confidence_sum[10m]) / rate(genovaai_prediction_confidence_count[10m])
+
+          # File upload rate
+          - record: genovaai:file_upload_rate_10m
+            expr: rate(genovaai_file_uploads_total[10m])
+
+          # Average file size
+          - record: genovaai:avg_file_upload_size_10m
+            expr: rate(genovaai_file_upload_size_bytes_sum[10m]) / rate(genovaai_file_upload_size_bytes_count[10m])
+
+          # SNP analysis throughput
+          - record: genovaai:snp_throughput_10m
+            expr: rate(genovaai_snps_processed_total[10m])
+
+          # Average SNP analysis duration
+          - record: genovaai:snp_analysis_avg_duration_10m
+            expr: rate(genovaai_snp_analysis_duration_seconds_sum[10m]) / rate(genovaai_snp_analysis_duration_seconds_count[10m])
+
+          # Database query rate
+          - record: genovaai:db_query_rate_5m
+            expr: rate(genovaai_db_queries_total[5m])
+
+          # Average database query latency
+          - record: genovaai:db_query_avg_duration_5m
+            expr: rate(genovaai_db_query_duration_seconds_sum[5m]) / rate(genovaai_db_query_duration_seconds_count[5m])
+
+          # AI API call rate
+          - record: genovaai:ai_api_call_rate_10m
+            expr: rate(genovaai_ai_api_calls_total[10m])
+
+          # AI API success rate
+          - record: genovaai:ai_api_success_rate_10m
+            expr: rate(genovaai_ai_api_calls_total{status="success"}[10m]) / rate(genovaai_ai_api_calls_total[10m])
+
+          # Token consumption rate (per hour)
+          - record: genovaai:ai_token_rate_1h
+            expr: rate(genovaai_ai_api_tokens_total[1h]) * 3600
+
+          # Celery task rate
+          - record: genovaai:celery_task_rate_5m
+            expr: rate(genovaai_celery_tasks_total[5m])
+
+          # User login rate
+          - record: genovaai:login_rate_15m
+            expr: rate(genovaai_user_logins_total[15m])
+
+          # Login failure ratio
+          - record: genovaai:login_failure_ratio_15m
+            expr: rate(genovaai_user_logins_total{status="failed"}[15m]) / rate(genovaai_user_logins_total[15m])
 ---
 apiVersion: v1
 kind: ServiceAccount

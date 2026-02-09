@@ -54,6 +54,8 @@ def predict_physical_characteristics():
     tags:
       - Predictions
     """
+    import time as _time
+    _pred_start = _time.time()
     data = request.json
     gender = data.get("gender")
     population = data.get("population")
@@ -114,6 +116,15 @@ Be scientifically accurate and avoid stereotypes."""
 
         response = model.generate_content(prompt)
         
+        # Track prediction metrics
+        try:
+            from utils.metrics import metrics_collector
+            _pred_duration = _time.time() - _pred_start
+            metrics_collector.track_prediction('physical_characteristics', duration=_pred_duration, success=True)
+            metrics_collector.track_ai_api_call('gemini_physical', duration=_pred_duration, success=True)
+        except ImportError:
+            pass
+        
         return jsonify({
             "success": True,
             "formatted_result": response.text,
@@ -122,6 +133,13 @@ Be scientifically accurate and avoid stereotypes."""
         })
         
     except Exception as e:
+        try:
+            from utils.metrics import metrics_collector
+            _pred_duration = _time.time() - _pred_start
+            metrics_collector.track_prediction('physical_characteristics', duration=_pred_duration, success=False)
+            metrics_collector.track_ai_api_call('gemini_physical', duration=_pred_duration, success=False)
+        except ImportError:
+            pass
         return jsonify({"success": False, "error": str(e)})
 
 

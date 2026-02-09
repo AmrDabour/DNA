@@ -40,6 +40,13 @@ def login():
             user.last_login = datetime.utcnow()
             db.session.commit()
             
+            # Track successful login
+            try:
+                from utils.metrics import metrics_collector
+                metrics_collector.track_login(success=True)
+            except ImportError:
+                pass
+            
             flash(f'Welcome back, {user.full_name or user.username}!', 'success')
             
             # Redirect to next page or index
@@ -48,6 +55,12 @@ def login():
                 return redirect(next_page)
             return redirect(url_for('index'))
         else:
+            # Track failed login
+            try:
+                from utils.metrics import metrics_collector
+                metrics_collector.track_login(success=False)
+            except ImportError:
+                pass
             flash('Invalid username or password.', 'error')
     
     return render_template('auth/login.html')
@@ -105,6 +118,13 @@ def register():
         
         db.session.add(user)
         db.session.commit()
+        
+        # Track successful registration
+        try:
+            from utils.metrics import metrics_collector
+            metrics_collector.track_registration(success=True)
+        except ImportError:
+            pass
         
         flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('auth.login'))

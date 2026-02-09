@@ -320,10 +320,30 @@ def upload_file():
             
             try:
                 file.save(file_path)
+                
+                # Track file upload metrics
+                try:
+                    from utils.metrics import metrics_collector
+                    file_size = os.path.getsize(file_path)
+                    file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'unknown'
+                    metrics_collector.track_file_upload(file_size=file_size, file_type=file_ext, success=True)
+                except ImportError:
+                    pass
+                
             except PermissionError as e:
+                try:
+                    from utils.metrics import metrics_collector
+                    metrics_collector.track_file_upload(file_size=0, file_type='unknown', success=False)
+                except ImportError:
+                    pass
                 flash(f"Permission denied: Cannot save file. The file may be open in another program.", "error")
                 return redirect(request.url)
             except Exception as e:
+                try:
+                    from utils.metrics import metrics_collector
+                    metrics_collector.track_file_upload(file_size=0, file_type='unknown', success=False)
+                except ImportError:
+                    pass
                 flash(f"Error saving file: {str(e)}", "error")
                 return redirect(request.url)
             

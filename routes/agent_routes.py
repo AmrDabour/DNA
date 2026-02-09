@@ -131,9 +131,19 @@ def chat():
         memory.add_user_message(message)
         
         # Run agent workflow with user_id for personalized memory injection
+        import time as _time
+        _agent_start = _time.time()
         print(f"🚀 Running agent workflow for message: {message[:50]}...")
         result = workflow.run(message, session_id, chat_history, user_id=user_id)
+        _agent_duration = _time.time() - _agent_start
         print(f"📤 Agent result: success={result.get('success')}, has_response={bool(result.get('response'))}")
+        
+        # Track agent conversation metrics
+        try:
+            from utils.metrics import metrics_collector
+            metrics_collector.track_agent_conversation(duration=_agent_duration, success=result.get('success', False))
+        except ImportError:
+            pass
         
         if not result.get("success"):
             print(f"❌ Agent error: {result.get('error')}")

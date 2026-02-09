@@ -42,6 +42,9 @@ def analyze_snp_file_task(
     """
     logger.info(f"Starting SNP analysis for: {file_path}")
     
+    import time as _time
+    _analysis_start = _time.time()
+    
     try:
         import pandas as pd
         
@@ -101,10 +104,37 @@ def analyze_snp_file_task(
                 result["vep_analysis"] = {"success": False, "error": str(vep_error)}
         
         logger.info(f"SNP analysis complete: {result['valid_snps']} valid SNPs")
+        
+        # Track SNP analysis metrics
+        try:
+            from utils.metrics import metrics_collector
+            _analysis_duration = _time.time() - _analysis_start
+            metrics_collector.track_snp_analysis(
+                duration=_analysis_duration,
+                success=True,
+                include_vep=include_vep,
+                snp_count=result.get('valid_snps', 0)
+            )
+        except ImportError:
+            pass
+        
         return result
         
     except Exception as e:
         logger.error(f"SNP analysis failed: {e}")
+        
+        # Track failed SNP analysis
+        try:
+            from utils.metrics import metrics_collector
+            _analysis_duration = _time.time() - _analysis_start
+            metrics_collector.track_snp_analysis(
+                duration=_analysis_duration,
+                success=False,
+                include_vep=include_vep
+            )
+        except ImportError:
+            pass
+        
         return {"success": False, "error": str(e)}
 
 
